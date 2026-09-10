@@ -1,8 +1,9 @@
 package io.github.koollsl.lsl.inspections
 
-import com.intellij.codeInspection.*
+import com.intellij.codeInspection.LocalInspectionTool
+import com.intellij.codeInspection.ProblemHighlightType
+import com.intellij.codeInspection.ProblemsHolder
 import com.intellij.openapi.components.service
-import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiElementVisitor
 import io.github.koollsl.lsl.LslLanguage
 import io.github.koollsl.lsl.preprocessor.LslPreprocessorEngine
@@ -16,22 +17,28 @@ class LslUndeclaredLabelInspection : LocalInspectionTool() {
     override fun getStaticDescription(): String = getDisplayName()
 
     override fun buildVisitor(holder: ProblemsHolder, isOnTheFly: Boolean): PsiElementVisitor {
+        // 1. Fetch file and preprocessor service ONCE per inspection pass
         val file = holder.file
-        val preprocessorEngine = file.project.service<LslPreprocessorEngine>()
+        val preprocessorEngine = holder.project.service<LslPreprocessorEngine>()
 
         return object : LslElementVisitor() {
+            override fun visitStatementJump(statementJump: LslStatementJump) {
+                // 2. Preprocessor check FIRST before evaluating jump statements
+                if (preprocessorEngine.isDisabledText(file, statementJump.textRange)) return
 
-            override fun visitElement(element: PsiElement) {
-                if (element !is LslStatementJump) return
-                if (element.textRange.isEmpty) return
-                if (preprocessorEngine.isDisabledText(file, element.textRange)) return
+                // 3. Guard check: only process non-empty jump statements
+                if (statementJump.textRange.isEmpty) return
 
-                if (element.reference?.resolve() == null) {
+                // 4. Verify label reference resolves successfully
+                if (statementJump.reference?.resolve() == null) {
+                    val labelName = statementJump.labelNameIdentifier?.text ?: statementJump.text
+
+                    // 5. Register problem for undeclared labels
                     holder.registerProblem(
-                        element,
-                        "Undeclared label",
+                        statementJump,
+                        "Undeclared label '$labelName'",
                         ProblemHighlightType.ERROR,
-                        element.labelNameIdentifier?.textRangeInParent
+                        statementJump.labelNameIdentifier?.textRangeInParent
                         // TODO: create variable fix
                     )
                 }

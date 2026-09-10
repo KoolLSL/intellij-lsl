@@ -12,6 +12,10 @@ abstract class ASTWrapperLslNamedElement(node: ASTNode) : ASTWrapperPsiElement(n
     override fun getNameIdentifier(): PsiElement? =
         findChildByType(LslTypes.IDENTIFIER)
 
+    // Tells TargetElementUtil that the declaration's primary focus sits at the identifier
+    override fun getTextOffset(): Int =
+        nameIdentifier?.textRange?.startOffset ?: super.getTextOffset()
+
     override fun getName(): String? =
         nameIdentifier?.text
 

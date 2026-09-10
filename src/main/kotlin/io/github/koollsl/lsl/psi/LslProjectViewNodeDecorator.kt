@@ -4,9 +4,7 @@ import com.intellij.ide.projectView.PresentationData
 import com.intellij.ide.projectView.ProjectViewNode
 import com.intellij.ide.projectView.ProjectViewNodeDecorator
 import com.intellij.ide.projectView.impl.nodes.PsiFileNode
-import com.intellij.packageDependencies.ui.PackageDependenciesNode
 import com.intellij.psi.util.PsiTreeUtil
-import com.intellij.ui.ColoredTreeCellRenderer
 import com.intellij.ui.JBColor
 import com.intellij.ui.SimpleTextAttributes
 
@@ -36,5 +34,4 @@ class LslProjectViewNodeDecorator : ProjectViewNodeDecorator {
         }
     }
 
-    override fun decorate(node: PackageDependenciesNode, cellRenderer: ColoredTreeCellRenderer) {}
 }

@@ -1,6 +1,9 @@
 package io.github.koollsl.lsl.inspections
 
-import com.intellij.codeInspection.*
+import com.intellij.codeInspection.LocalInspectionTool
+import com.intellij.codeInspection.LocalQuickFixOnPsiElement
+import com.intellij.codeInspection.ProblemHighlightType
+import com.intellij.codeInspection.ProblemsHolder
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiElement
@@ -11,12 +14,7 @@ import com.intellij.psi.search.searches.ReferencesSearch
 import com.intellij.psi.util.parents
 import io.github.koollsl.lsl.LslLanguage
 import io.github.koollsl.lsl.preprocessor.LslPreprocessorEngine
-import io.github.koollsl.lsl.psi.LslElementVisitor
-import io.github.koollsl.lsl.psi.LslEvent
-import io.github.koollsl.lsl.psi.LslFunction
-import io.github.koollsl.lsl.psi.LslGlobalVariable
-import io.github.koollsl.lsl.psi.LslStatementVariable
-import io.github.koollsl.lsl.psi.LslVariable
+import io.github.koollsl.lsl.psi.*
 
 class LslUnusedVariableInspection : LocalInspectionTool() {
     override fun getDisplayName(): String = "Unused variable"
@@ -25,35 +23,48 @@ class LslUnusedVariableInspection : LocalInspectionTool() {
     override fun getStaticDescription(): String = getDisplayName()
 
     override fun buildVisitor(holder: ProblemsHolder, isOnTheFly: Boolean): PsiElementVisitor {
+        // 1. Fetch file and preprocessor service ONCE per inspection pass
         val file = holder.file
-        val preprocessorEngine = file.project.service<LslPreprocessorEngine>()
+        val preprocessorEngine = holder.project.service<LslPreprocessorEngine>()
 
         return object : LslElementVisitor() {
+            override fun visitGlobalVariable(variable: LslGlobalVariable) {
+                // 2. Preprocessor check FIRST before evaluating global variables
+                if (preprocessorEngine.isDisabledText(file, variable.textRange)) return
+                checkUnusedVariable(variable)
+            }
 
-            override fun visitElement(element: PsiElement) {
-                if (element !is LslGlobalVariable && element !is LslStatementVariable) return
-                if (element.textRange.isEmpty) return
-                if (preprocessorEngine.isDisabledText(file, element.textRange)) return
+            override fun visitStatementVariable(variable: LslStatementVariable) {
+                // Preprocessor check FIRST before evaluating statement variables
+                if (preprocessorEngine.isDisabledText(file, variable.textRange)) return
+                checkUnusedVariable(variable)
+            }
 
-                // Determine appropriate LocalSearchScope based on variable scope
-                val searchScope = when (element) {
+            private fun checkUnusedVariable(variable: LslVariable) {
+                // 3. Guard check: process non-empty variables
+                if (variable.textRange.isEmpty) return
+
+                // 4. Determine appropriate LocalSearchScope based on variable scope
+                val searchScope = when (variable) {
                     is LslGlobalVariable -> LocalSearchScope(file)
                     is LslStatementVariable -> {
-                        val parentScope = element.parents(false)
+                        val parentScope = variable.parents(false)
                             .firstOrNull { it is LslFunction || it is LslEvent } ?: file
                         LocalSearchScope(parentScope)
                     }
                     else -> return
                 }
 
-                if (ReferencesSearch.search(element, searchScope).findFirst() == null) {
-                    val targetVariable = element as LslVariable
+                // 5. Flag if no references exist within the scope
+                if (ReferencesSearch.search(variable, searchScope).findFirst() == null) {
+                    val variableName = variable.name ?: variable.identifyingElement?.text ?: "variable"
+
                     holder.registerProblem(
-                        element,
-                        "Unused variable",
+                        variable,
+                        "Unused variable '$variableName'",
                         ProblemHighlightType.LIKE_UNUSED_SYMBOL,
-                        targetVariable.identifyingElement?.textRangeInParent,
-                        RemoveUnusedVariableFix(targetVariable)
+                        variable.identifyingElement?.textRangeInParent,
+                        RemoveUnusedVariableFix(variable)
                     )
                 }
             }

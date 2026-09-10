@@ -1,11 +1,10 @@
 package io.github.koollsl.lsl.inspections
 
-import com.intellij.codeInspection.*
-import com.intellij.openapi.components.service
-import com.intellij.psi.PsiElement
+import com.intellij.codeInspection.LocalInspectionTool
+import com.intellij.codeInspection.ProblemHighlightType
+import com.intellij.codeInspection.ProblemsHolder
 import com.intellij.psi.PsiElementVisitor
 import io.github.koollsl.lsl.LslLanguage
-import io.github.koollsl.lsl.preprocessor.LslPreprocessorEngine
 import io.github.koollsl.lsl.psi.LslElementVisitor
 import io.github.koollsl.lsl.psi.LslStatementState
 
@@ -16,23 +15,21 @@ class LslUndeclaredStateInspection : LocalInspectionTool() {
     override fun getStaticDescription(): String = getDisplayName()
 
     override fun buildVisitor(holder: ProblemsHolder, isOnTheFly: Boolean): PsiElementVisitor {
-        val file = holder.file
-        val preprocessorEngine = file.project.service<LslPreprocessorEngine>()
-
         return object : LslElementVisitor() {
+            override fun visitStatementState(statementState: LslStatementState) {
+                // 1. Guard check: only process non-empty state statements
+                if (statementState.textRange.isEmpty) return
 
-            override fun visitElement(element: PsiElement) {
-                if (element !is LslStatementState) return
-                if (element.textRange.isEmpty) return
-                if (preprocessorEngine.isDisabledText(file, element.textRange)) return
+                // 2. Verify state reference resolves successfully
+                if (statementState.reference?.resolve() == null) {
+                    val stateName = statementState.stateNameIdentifier?.text ?: statementState.text
 
-                if (element.reference?.resolve() == null) {
                     holder.registerProblem(
-                        element,
-                        "Undeclared state",
+                        statementState,
+                        "Undeclared state '$stateName'",
                         ProblemHighlightType.ERROR,
-                        element.stateNameIdentifier?.textRangeInParent
-                        // TODO: create variable fix
+                        statementState.stateNameIdentifier?.textRangeInParent
+                        // TODO: create state fix
                     )
                 }
             }

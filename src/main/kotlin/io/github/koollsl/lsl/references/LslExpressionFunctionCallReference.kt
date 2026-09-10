@@ -4,9 +4,8 @@ import com.intellij.openapi.components.service
 import com.intellij.openapi.util.TextRange
 import com.intellij.psi.*
 import com.intellij.psi.impl.source.resolve.ResolveCache
-import com.intellij.psi.search.FilenameIndex
-import com.intellij.psi.search.GlobalSearchScope
 import io.github.koollsl.lsl.KwdbData
+import io.github.koollsl.lsl.preprocessor.LslIncludesCollector
 import io.github.koollsl.lsl.preprocessor.LslPreprocessorEngine
 import io.github.koollsl.lsl.psi.LslExpressionFunctionCall
 import io.github.koollsl.lsl.psi.LslFile
@@ -51,7 +50,8 @@ class LslExpressionFunctionCallReference(val element: LslExpressionFunctionCall)
             .filter { it.name == functionName }
 
         // 2. Included files
-        val includedFiles = engine.getIncludedFiles(element.containingFile as LslFile)
+        val includedFiles =
+            LslIncludesCollector.getInstance(project).getIncludedFiles(element.containingFile as LslFile)
         val includedFunctions = includedFiles.flatMap { file ->
             (file as? LslFile)?.children
                 ?.filterIsInstance<LslFunction>()
@@ -59,24 +59,25 @@ class LslExpressionFunctionCallReference(val element: LslExpressionFunctionCall)
                 ?: emptyList()
         }
 
+        // Not needed, and it is laggy! Included files are enough scope
         // 3. Workspace library files (.lslp / .lslm)
-        val lslpVirtualFiles = listOf("lslp", "lslm").flatMap { ext ->
-            FilenameIndex.getAllFilesByExt(project, ext, GlobalSearchScope.projectScope(project))
-        }
-        val lslpFunctions = lslpVirtualFiles.flatMap { virtualFile ->
-            val psiFile = PsiManager.getInstance(project).findFile(virtualFile) as? LslFile
-            psiFile?.children
-                ?.filterIsInstance<LslFunction>()
-                ?.filter { it.name == functionName }
-                ?: emptyList()
-        }
+//        val lslpVirtualFiles = listOf("lslp", "lslm").flatMap { ext ->
+//            FilenameIndex.getAllFilesByExt(project, ext, GlobalSearchScope.projectScope(project))
+//        }
+//        val lslpFunctions = lslpVirtualFiles.flatMap { virtualFile ->
+//            val psiFile = PsiManager.getInstance(project).findFile(virtualFile) as? LslFile
+//            psiFile?.children
+//                ?.filterIsInstance<LslFunction>()
+//                ?.filter { it.name == functionName }
+//                ?: emptyList()
+//        }
 
         // 4. Built‑in functions
         val builtinFunctions = listOfNotNull(
             KwdbData.getInstance(project).functions[functionName]
         )
 
-        return (localFunctions + includedFunctions + lslpFunctions + builtinFunctions)
+        return (localFunctions + includedFunctions + builtinFunctions)
             .map { PsiElementResolveResult(it) }
             .toTypedArray()
     }

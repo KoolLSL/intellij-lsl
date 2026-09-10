@@ -1,6 +1,9 @@
 package io.github.koollsl.lsl.inspections
 
-import com.intellij.codeInspection.*
+import com.intellij.codeInspection.LocalInspectionTool
+import com.intellij.codeInspection.LocalQuickFixOnPsiElement
+import com.intellij.codeInspection.ProblemHighlightType
+import com.intellij.codeInspection.ProblemsHolder
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiElement
@@ -20,23 +23,28 @@ class LslUnusedFunctionInspection : LocalInspectionTool() {
     override fun getStaticDescription(): String = getDisplayName()
 
     override fun buildVisitor(holder: ProblemsHolder, isOnTheFly: Boolean): PsiElementVisitor {
+        // 1. Fetch file and preprocessor service ONCE per inspection pass
         val file = holder.file
-        val preprocessorEngine = file.project.service<LslPreprocessorEngine>()
+        val preprocessorEngine = holder.project.service<LslPreprocessorEngine>()
 
         return object : LslElementVisitor() {
-
-            override fun visitElement(element: PsiElement) {
+            override fun visitPsiElement(element: PsiElement) {
+                // 2. Guard checks: process non-empty functions
                 if (element !is LslFunction) return
                 if (element.textRange.isEmpty) return
+
+                // 3. Preprocessor check FIRST before evaluating functions
                 if (preprocessorEngine.isDisabledText(file, element.textRange)) return
 
-                // Restrict search scope to the containing file since LSL user functions are file-local
+                // 4. Restrict search scope to the containing file since LSL user functions are file-local
                 val searchScope = LocalSearchScope(file)
 
+                // 5. Flag if no references exist within the file scope
                 if (ReferencesSearch.search(element, searchScope).findFirst() == null) {
+                    val functionName = element.name ?: element.identifyingElement?.text ?: "function"
                     holder.registerProblem(
                         element,
-                        "Unused function",
+                        "Unused function '$functionName'",
                         ProblemHighlightType.LIKE_UNUSED_SYMBOL,
                         element.identifyingElement?.textRangeInParent,
                         RemoveUnusedFunctionFix(element)

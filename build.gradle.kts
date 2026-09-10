@@ -59,6 +59,12 @@ intellij {
     plugins.set(listOf("java"))
 }
 
+kotlin {
+    jvmToolchain {
+        languageVersion.set(JavaLanguageVersion.of(17))
+    }
+}
+
 // Disable buildSearchableOptions for fast local development by default.
 val isRelease = properties["release"]?.toString()?.toBoolean() == true
 
@@ -167,7 +173,9 @@ tasks.register("installPluginToIDE") {
                 "-NoProfile",
                 "-Command",
                 // Stop IntelliJ if running
-                "\$p = Get-Process idea64 -ErrorAction SilentlyContinue;" )
+                "\$p = Get-Process idea64 -ErrorAction SilentlyContinue; " +
+                        "if (\$p) { \$p.CloseMainWindow(); Start-Sleep -Seconds 2; \$p.Kill() }; "
+            )
         }
     }
 }

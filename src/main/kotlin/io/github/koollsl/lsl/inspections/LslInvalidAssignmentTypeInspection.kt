@@ -1,18 +1,17 @@
 package io.github.koollsl.lsl.inspections
 
-import com.intellij.codeInspection.*
-import com.intellij.psi.PsiElement
+import com.intellij.codeInspection.LocalInspectionTool
+import com.intellij.codeInspection.ProblemHighlightType
+import com.intellij.codeInspection.ProblemsHolder
+import com.intellij.openapi.components.service
 import com.intellij.psi.PsiElementVisitor
 import com.intellij.psi.tree.IElementType
+import io.github.koollsl.lsl.KwdbData
 import io.github.koollsl.lsl.LslLanguage
 import io.github.koollsl.lsl.LslPrimitiveType
 import io.github.koollsl.lsl.parser.LslTypes
 import io.github.koollsl.lsl.preprocessor.LslPreprocessorEngine
-import io.github.koollsl.lsl.psi.LslElementVisitor
-import io.github.koollsl.lsl.psi.LslExpression
-import io.github.koollsl.lsl.psi.LslExpressionAssignment
-import io.github.koollsl.lsl.psi.LslGlobalVariable
-import io.github.koollsl.lsl.psi.LslStatementVariable
+import io.github.koollsl.lsl.psi.*
 
 class LslInvalidAssignmentTypeInspection : LocalInspectionTool() {
 
@@ -22,40 +21,58 @@ class LslInvalidAssignmentTypeInspection : LocalInspectionTool() {
     override fun getStaticDescription(): String = "Invalid assignment type"
 
     override fun buildVisitor(holder: ProblemsHolder, isOnTheFly: Boolean): PsiElementVisitor {
+        // 1. Fetch file and services ONCE per inspection pass
         val file = holder.file
-        val preprocessorEngine = file.project.getService(LslPreprocessorEngine::class.java)
+        val preprocessorEngine = holder.project.service<LslPreprocessorEngine>()
+        val kwdbData = KwdbData.getInstance(holder.project)
 
         return object : LslElementVisitor() {
 
-            override fun visitExpressionAssignment(assignment: LslExpressionAssignment) {
+            override fun visitExpressionAssignment(expression: LslExpressionAssignment) {
+                // 2. Preprocessor check FIRST before executing assignment type logic
+                if (preprocessorEngine.isDisabledText(file, expression.textRange)) return
+
+                val lValue = expression.lValue
+                val identifierText = lValue?.node?.text
+                val isConstant = identifierText != null && kwdbData.constants.containsKey(identifierText)
+
+                if (isConstant) {
+                    holder.registerProblem(
+                        lValue ?: expression,
+                        "Cannot assign to a constant",
+                        ProblemHighlightType.GENERIC_ERROR
+                    )
+                    return
+                }
+
                 checkAssignment(
-                    element = assignment,
-                    variableType = assignment.lValue?.lslType,
-                    expression = assignment.expression,
-                    operator = assignment.operator,
-                    preprocessorEngine = preprocessorEngine,
+                    variableType = lValue?.lslType,
+                    expression = expression.expression,
+                    operator = expression.operator,
                     holder = holder
                 )
             }
 
             override fun visitGlobalVariable(variable: LslGlobalVariable) {
+                // 2. Preprocessor check FIRST before executing assignment type logic
+                if (preprocessorEngine.isDisabledText(file, variable.textRange)) return
+
                 checkAssignment(
-                    element = variable,
                     variableType = variable.lslType,
                     expression = variable.expression,
                     operator = LslTypes.ASSIGN,
-                    preprocessorEngine = preprocessorEngine,
                     holder = holder
                 )
             }
 
             override fun visitStatementVariable(variable: LslStatementVariable) {
+                // 2. Preprocessor check FIRST before executing assignment type logic
+                if (preprocessorEngine.isDisabledText(file, variable.textRange)) return
+
                 checkAssignment(
-                    element = variable,
                     variableType = variable.lslType,
                     expression = variable.expression,
                     operator = LslTypes.ASSIGN,
-                    preprocessorEngine = preprocessorEngine,
                     holder = holder
                 )
             }
@@ -63,15 +80,12 @@ class LslInvalidAssignmentTypeInspection : LocalInspectionTool() {
     }
 
     private fun checkAssignment(
-        element: PsiElement,
         variableType: LslPrimitiveType?,
         expression: LslExpression?,
         operator: IElementType?,
-        preprocessorEngine: LslPreprocessorEngine,
         holder: ProblemsHolder
     ) {
         if (variableType == null || expression == null) return
-        if (preprocessorEngine.isDisabledText(holder.file, element.textRange)) return
 
         val expressionType = expression.lslType ?: LslPrimitiveType.INVALID
 

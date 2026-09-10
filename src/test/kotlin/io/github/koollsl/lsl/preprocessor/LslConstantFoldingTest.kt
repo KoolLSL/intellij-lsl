@@ -325,33 +325,33 @@ default {
 
     fun testEvaluateConstantExprAndElementFactoryDirectly() {
         val exprInt = io.github.koollsl.lsl.psi.LslElementFactory.createExpression(project, "-1000")
-        val valInt = LslPreprocessorEngine.evaluateConstantExpr(exprInt)
+        val valInt = LslPreprocessorEngine.evaluateConstantExpression(exprInt)
         assertTrue(valInt is LslPreprocessorEngine.ConstantValue.IntVal)
         assertEquals(-1000, (valInt as LslPreprocessorEngine.ConstantValue.IntVal).value)
         assertEquals("-1000", valInt.toLiteralString())
 
         val exprFloat = io.github.koollsl.lsl.psi.LslElementFactory.createExpression(project, "-2.5")
-        val valFloat = LslPreprocessorEngine.evaluateConstantExpr(exprFloat)
+        val valFloat = LslPreprocessorEngine.evaluateConstantExpression(exprFloat)
         assertTrue(valFloat is LslPreprocessorEngine.ConstantValue.FloatVal)
         assertEquals(-2.5f, (valFloat as LslPreprocessorEngine.ConstantValue.FloatVal).value, 0.0001f)
         assertEquals("-2.5", valFloat.toLiteralString())
 
         val exprVec = io.github.koollsl.lsl.psi.LslElementFactory.createExpression(project, "<-1.0, 2.0, -3.0>")
-        val valVec = LslPreprocessorEngine.evaluateConstantExpr(exprVec)
+        val valVec = LslPreprocessorEngine.evaluateConstantExpression(exprVec)
         assertTrue(valVec is LslPreprocessorEngine.ConstantValue.VectorVal)
         assertEquals("<-1.0, 2.0, -3.0>", valVec?.toLiteralString())
         val parsedVecExpr = io.github.koollsl.lsl.psi.LslElementFactory.createExpression(project, valVec!!.toLiteralString())
         assertNotNull(parsedVecExpr)
 
         val exprRot = io.github.koollsl.lsl.psi.LslElementFactory.createExpression(project, "<0.0, -0.5, 0.0, -0.866>")
-        val valRot = LslPreprocessorEngine.evaluateConstantExpr(exprRot)
+        val valRot = LslPreprocessorEngine.evaluateConstantExpression(exprRot)
         assertTrue(valRot is LslPreprocessorEngine.ConstantValue.RotationVal)
         assertEquals("<0.0, -0.5, 0.0, -0.866>", valRot?.toLiteralString())
         val parsedRotExpr = io.github.koollsl.lsl.psi.LslElementFactory.createExpression(project, valRot!!.toLiteralString())
         assertNotNull(parsedRotExpr)
 
         val exprList = io.github.koollsl.lsl.psi.LslElementFactory.createExpression(project, "[-100, -2.5, <-1.0, 2.0, -3.0>]")
-        val valList = LslPreprocessorEngine.evaluateConstantExpr(exprList)
+        val valList = LslPreprocessorEngine.evaluateConstantExpression(exprList)
         assertTrue(valList is LslPreprocessorEngine.ConstantValue.ListVal)
         assertEquals("[-100, -2.5, <-1.0, 2.0, -3.0>]", valList?.toLiteralString())
         val parsedListExpr = io.github.koollsl.lsl.psi.LslElementFactory.createExpression(project, valList!!.toLiteralString())

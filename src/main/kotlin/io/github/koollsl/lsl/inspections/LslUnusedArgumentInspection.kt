@@ -1,6 +1,9 @@
 package io.github.koollsl.lsl.inspections
 
-import com.intellij.codeInspection.*
+import com.intellij.codeInspection.LocalInspectionTool
+import com.intellij.codeInspection.LocalQuickFixOnPsiElement
+import com.intellij.codeInspection.ProblemHighlightType
+import com.intellij.codeInspection.ProblemsHolder
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiElement
@@ -24,30 +27,34 @@ class LslUnusedArgumentInspection : LocalInspectionTool() {
     override fun getStaticDescription(): String = getDisplayName()
 
     override fun buildVisitor(holder: ProblemsHolder, isOnTheFly: Boolean): PsiElementVisitor {
+        // 1. Fetch file and preprocessor service ONCE per inspection pass
         val file = holder.file
-        val preprocessorEngine = file.project.service<LslPreprocessorEngine>()
+        val preprocessorEngine = holder.project.service<LslPreprocessorEngine>()
 
         return object : LslElementVisitor() {
+            override fun visitArgument(argument: LslArgument) {
+                // 2. Preprocessor check FIRST before evaluating function arguments
+                if (preprocessorEngine.isDisabledText(file, argument.textRange)) return
 
-            override fun visitElement(element: PsiElement) {
-                if (element !is LslArgument) return
-                if (element.textRange.isEmpty) return
-                if (preprocessorEngine.isDisabledText(file, element.textRange)) return
+                // 3. Guard check: process non-empty arguments
+                if (argument.textRange.isEmpty) return
 
-                // Event parameters are defined by the LSL language spec and cannot be removed
-                if (element.parentsOfType(LslEvent::class.java).any()) return
+                // 4. Event parameters are defined by the LSL language spec and cannot be removed
+                if (argument.parentsOfType(LslEvent::class.java).any()) return
 
-                // Restrict search scope to the containing function body for performance
-                val functionScope = element.parentsOfType(LslFunction::class.java).firstOrNull() ?: return
+                // 5. Restrict search scope to the containing function body for performance
+                val functionScope = argument.parentsOfType(LslFunction::class.java).firstOrNull() ?: return
                 val searchScope = LocalSearchScope(functionScope)
 
-                if (ReferencesSearch.search(element, searchScope).findFirst() == null) {
+                // 6. Flag if no references exist within the function scope
+                if (ReferencesSearch.search(argument, searchScope).findFirst() == null) {
+                    val argumentName = argument.name ?: argument.identifyingElement?.text ?: "argument"
                     holder.registerProblem(
-                        element,
-                        "Unused argument",
+                        argument,
+                        "Unused argument '$argumentName'",
                         ProblemHighlightType.LIKE_UNUSED_SYMBOL,
-                        element.identifyingElement?.textRangeInParent,
-                        RemoveUnusedArgumentFix(element)
+                        argument.identifyingElement?.textRangeInParent,
+                        RemoveUnusedArgumentFix(argument)
                     )
                 }
             }

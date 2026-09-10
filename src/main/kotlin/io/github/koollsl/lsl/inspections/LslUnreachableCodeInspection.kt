@@ -1,6 +1,9 @@
 package io.github.koollsl.lsl.inspections
 
-import com.intellij.codeInspection.*
+import com.intellij.codeInspection.LocalInspectionTool
+import com.intellij.codeInspection.LocalQuickFixOnPsiElement
+import com.intellij.codeInspection.ProblemHighlightType
+import com.intellij.codeInspection.ProblemsHolder
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.TextRange
@@ -23,23 +26,27 @@ class LslUnreachableCodeInspection : LocalInspectionTool() {
     override fun getStaticDescription(): String = getDisplayName()
 
     override fun buildVisitor(holder: ProblemsHolder, isOnTheFly: Boolean): PsiElementVisitor {
+        // 1. Fetch file and preprocessor service ONCE per inspection pass
         val file = holder.file
-        val preprocessorEngine = file.project.service<LslPreprocessorEngine>()
+        val preprocessorEngine = holder.project.service<LslPreprocessorEngine>()
 
         return object : LslElementVisitor() {
+            override fun visitStatementBlock(statementBlock: LslStatementBlock) {
+                // 2. Preprocessor check FIRST before evaluating statement blocks
+                if (preprocessorEngine.isDisabledText(file, statementBlock.textRange)) return
 
-            override fun visitElement(element: PsiElement) {
-                if (element !is LslStatementBlock) return
-                if (preprocessorEngine.isDisabledText(file, element.textRange)) return
+                // 3. Guard check: process non-empty statement blocks
+                if (statementBlock.textRange.isEmpty) return
 
-                val unreachableCodeRanges = findUnreachableCodeRanges(element)
+                // 4. Identify contiguous ranges of unreachable code in the block
+                val unreachableCodeRanges = findUnreachableCodeRanges(statementBlock)
 
                 unreachableCodeRanges.forEach { range ->
                     val first = range.first()
                     val last = range.last()
 
                     holder.registerProblem(
-                        element,
+                        statementBlock,
                         "Unreachable code",
                         ProblemHighlightType.LIKE_UNUSED_SYMBOL,
                         TextRange(first.startOffsetInParent, last.textRangeInParent.endOffset),
@@ -61,6 +68,7 @@ class LslUnreachableCodeInspection : LocalInspectionTool() {
         val searchScope = LocalSearchScope(parentScope)
 
         block.children.forEach { element ->
+            // If code was unreachable, check if a targeted label restores reachability
             if (!isReachable && element is LslStatementLabel && ReferencesSearch.search(element, searchScope).findFirst() != null) {
                 isReachable = true
 
@@ -74,6 +82,7 @@ class LslUnreachableCodeInspection : LocalInspectionTool() {
                 currentUnreachableBlock.add(element)
             }
 
+            // Determine if the current statement breaks subsequent code reachability
             isReachable = isReachable && when (element) {
                 is LslStatementReturn -> false
                 is LslStatementState -> false

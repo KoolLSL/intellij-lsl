@@ -1,22 +1,20 @@
 package io.github.koollsl.lsl.preprocessor
 
 import com.intellij.ide.plugins.PluginManagerCore
-import com.intellij.lang.annotation.AnnotationHolder
-import com.intellij.lang.annotation.HighlightSeverity
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.fileEditor.FileDocumentManager
+import com.intellij.openapi.module.ModuleUtilCore
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.roots.ModuleRootManager
 import com.intellij.openapi.roots.ProjectRootManager
 import com.intellij.openapi.util.TextRange
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.*
-import com.intellij.psi.search.FilenameIndex
-import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.util.CachedValueProvider
 import com.intellij.psi.util.CachedValuesManager
 import com.intellij.psi.util.PsiModificationTracker
@@ -27,14 +25,14 @@ import io.github.koollsl.lsl.parser.LslTypes
 import io.github.koollsl.lsl.psi.*
 import io.github.koollsl.lsl.safeguards.LslBuildOutputNotificationProvider
 import io.github.koollsl.lsl.settings.LslSettings
+import io.github.koollsl.lsl.utils.LslDebug
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.collections.ArrayDeque
 import kotlin.collections.last
-import com.intellij.openapi.vfs.VfsUtilCore
-import com.intellij.openapi.vfs.VirtualFileVisitor
+
 
 @Service(Service.Level.PROJECT)
 class LslPreprocessorEngine(private val project: Project) {
@@ -49,11 +47,12 @@ class LslPreprocessorEngine(private val project: Project) {
         var currentBranchActive: Boolean
     )
 
-    private data class PreprocessorContext(
+    data class PreprocessorContext(
         val file: PsiFile?,
         val project: Project,
         val definitions: MutableMap<String, String> = mutableMapOf(),
-        val visitedFiles: Set<String> = emptySet(),
+        val visitedFiles: MutableSet<String> = mutableSetOf(),
+        val isRecursing: Boolean = false, // Prevents clearing tracking sets during recursive sub-calls
         val depth: Int = 0,
         val markIncludes: Boolean = false,
         val includeCounter: AtomicInteger = AtomicInteger(0),
@@ -64,15 +63,11 @@ class LslPreprocessorEngine(private val project: Project) {
         val onIncludeFailed: ((includedPath: String, lineNumber: Int) -> Unit)? = null,
     )
 
-//    private fun DEBUG(message: String) {
-//        try {
-//            File("C:/temp/lsl_debug.txt").appendText(message + "\n")
-//        } catch (_: Exception) {
-//            // ignore
-//        }
-//    }
+    private fun VirtualFile.toPsi(): PsiFile? =
+        PsiManager.getInstance(project).findFile(this)
 
-
+    private fun PsiFile.toVf(): VirtualFile? =
+        this.virtualFile
 
 
     private fun walkPreprocessorDirectives(ctx: PreprocessorContext) {
@@ -101,7 +96,7 @@ class LslPreprocessorEngine(private val project: Project) {
             if (match != null) {
                 val directive = match.groupValues.getOrNull(1)?.lowercase() ?: continue
                 val rawArgs = match.groupValues.getOrNull(2) ?: ""
-                val args = stripTrailingComment(rawArgs).trim()
+                val args = LslDirectiveEvaluator.stripTrailingComment(rawArgs).trim()
 
                 when (directive) {
                     "ifdef" -> {
@@ -136,8 +131,11 @@ class LslPreprocessorEngine(private val project: Project) {
                         top.conditionMet = true
                     }
 
-                    "endif" -> if (stack.isNotEmpty()) stack.removeLast()
-                    "define" -> if (isCurrentlyActive(stack)) parseAndAddDefine(args, ctx.definitions)
+                    "endif" -> if (stack.isNotEmpty())
+                        stack.removeLast()
+
+                    "define" -> if (isCurrentlyActive(stack))
+                        LslDirectiveEvaluator.parseAndAddDefine(args, ctx.definitions)
                     "undef" -> if (isCurrentlyActive(stack)) {
                         val ident = args.split(Regex("""\s+""")).firstOrNull()?.trim() ?: ""
                         if (ident.isNotEmpty()) ctx.definitions.remove(ident)
@@ -150,30 +148,31 @@ class LslPreprocessorEngine(private val project: Project) {
                         }
                         ctx.onInlineDirective?.invoke(rawArgs.trimEnd())
                     }
-
                     "include" -> if (isCurrentlyActive(stack)) {
                         val includedPath = args.trim().trim('"', '<', '>')
                         if (includedPath.isNotEmpty()) {
-                            val includedPsi = resolveIncludeFile(includedPath, file, currentVisited)
-                            //DEBUG("    Include name: '${includedPsi?.name}' depth=${ctx.depth}")
+                            val collector = LslIncludesCollector.getInstance(project)
+                            val includedPsi = collector.resolveIncludeFile(includedPath, file)
+
                             if (includedPsi != null && includedPsi.isValid) {
-                                // actually process the included file
-                                //ctx.onIncludeResolved?.invoke(includedPsi, ctx.copy(visitedFiles = currentVisited))
-                                val newCtx = PreprocessorContext(
-                                    file = includedPsi,
-                                    project = project,
-                                    definitions = ctx.definitions,
-                                    visitedFiles = currentVisited,
-                                    depth = ctx.depth + 1,
-                                    markIncludes = ctx.markIncludes,
-                                    includeCounter = ctx.includeCounter,
-                                    onNormalLine = ctx.onNormalLine,
-                                    onInactiveLine = ctx.onInactiveLine,
-                                    onInlineDirective = ctx.onInlineDirective,
-                                    onIncludeResolved = ctx.onIncludeResolved,
-                                    onIncludeFailed = ctx.onIncludeFailed
-                                )
-                                ctx.onIncludeResolved?.invoke(includedPsi, newCtx)
+                                val pathKey = includedPsi.virtualFile?.canonicalPath
+                                    ?: includedPsi.virtualFile?.path
+                                    ?: includedPsi.name
+
+                                // VÉRIFICATION DÉDOUBLONNAGE : Ne pas ré-inclure si déjà dans visitedFiles
+                                if (ctx.visitedFiles.add(pathKey)) { // add() updates the set AND returns true if pathKey was new
+                                    val newCtx = ctx.copy(
+                                        file = includedPsi,
+                                        depth = ctx.depth + 1
+                                        // visitedFiles is already updated in-place and shared automatically
+                                    )
+                                    ctx.onIncludeResolved?.invoke(includedPsi, newCtx)
+                                    LslDebug.log("#include RESOLVED: $pathKey")
+
+                                } else {
+                                    // Fichier déjà inliné plus haut dans l'arbre d'inclusion
+                                    LslDebug.log("#include SKIP (already inlined) : $pathKey")
+                                }
                             } else {
                                 ctx.onIncludeFailed?.invoke(includedPath, lineNumber)
                             }
@@ -225,17 +224,7 @@ class LslPreprocessorEngine(private val project: Project) {
             )
         }
     }
-    fun OLD_getDisabledRanges(file: PsiFile?): List<TextRange> {
-        if (file == null || !file.isValid) return emptyList()
-        return try {
-            CachedValuesManager.getCachedValue(file) {
-                val ranges = runCatching { computeDisabledRanges(file) }.getOrDefault(emptyList())
-                CachedValueProvider.Result.create(ranges, file)
-            } ?: emptyList()
-        } catch (_: Exception) {
-            runCatching { computeDisabledRanges(file) }.getOrDefault(emptyList())
-        }
-    }
+
     /**
      * Checks if a specific TextRange is fully contained within any disabled preprocessor range in the file.
      * Efficiently uses the cached getDisabledRanges list.
@@ -265,130 +254,28 @@ class LslPreprocessorEngine(private val project: Project) {
             return !definitions.containsKey(ident)
         }
         if (trimmed.isEmpty()) return false
-        val tokens = tokenize(trimmed)
+        val tokens = LslDirectiveEvaluator.tokenize(trimmed)
         if (tokens.isEmpty()) return false
-        val parser = ExpressionParser(tokens, definitions)
+        val parser = LslDirectiveEvaluator.ExpressionParser(tokens, definitions)
         return runCatching { parser.parse() }.getOrDefault(false)
     }
 
-    fun getIncludedFiles(file: PsiFile?): Set<PsiFile> {
-        if (file == null || !file.isValid) return emptySet()
-        return try {
-            CachedValuesManager.getCachedValue(file) {
-                val visited = mutableSetOf<String>()
-                file.virtualFile?.path?.let { visited.add(it) }
-                file.virtualFile?.canonicalPath?.let { visited.add(it) }
-                file.originalFile.virtualFile?.path?.let { visited.add(it) }
-                file.originalFile.virtualFile?.canonicalPath?.let { visited.add(it) }
-                visited.add(file.name)
-
-                val result = runCatching {
-                    collectIncludedFiles(file = file, file.project ,visitedFiles = visited, depth = 0)
-                }.getOrDefault(emptySet())
-
-                CachedValueProvider.Result.create(result, file, PsiModificationTracker.MODIFICATION_COUNT)
-            } ?: emptySet()
-        } catch (_: Exception) {
-            emptySet()
-        }
-    }
-
-
-    fun resolveIncludeFile(
-        includedPath: String,
-        containingFile: PsiFile,
-        visitedFiles: Set<String> = emptySet()
-    ): PsiFile? {
-
-        val project = containingFile.project
-        if (project.isDisposed || includedPath.isEmpty()) return null
-
-        // --- 1. Normalize path ---
-        val cleanPath = includedPath
-            .trim('"', '\'', '<', '>', ' ')
-            .replace('\\', '/')
-            .removePrefix("/")
-
-        val targetPath = if (cleanPath.endsWith(".lslm", ignoreCase = true)) cleanPath else "$cleanPath.lslm"
-        val cleanName = targetPath.substringAfterLast('/')
-        //DEBUG("resolveIncludeFile: includedPath='$includedPath', targetPath='$targetPath', " +
-        //        "containing='${containingFile?.name}', visited=${visitedFiles.size}")
-
-        // --- 2. Resolve containing file directory ---
-        val containingVF = containingFile.virtualFile
-            ?: containingFile.originalFile.virtualFile
-            ?: containingFile.viewProvider.virtualFile
+    fun getModuleAndRoots(file: PsiFile, project: Project): List<VirtualFile> {
+        val containingVF = file.virtualFile
+            ?: file.originalFile.virtualFile
+            ?: file.viewProvider.virtualFile
 
         val parentDir = containingVF.parent
 
-        // --- 3. Resolve module content roots ---
-        val rootManager = ProjectRootManager.getInstance(project)
-        val contentRoots = rootManager.contentRoots.toList()
-        val sourceRoots = rootManager.contentSourceRoots.toList()
-        val allRoots = (contentRoots + sourceRoots).distinct()
-
-        //DEBUG("    parentDir='${containingFile?.virtualFile?.parent?.path}'")
-        //DEBUG("    allRoots=${allRoots.map { it.path }}")
-        // --- 4. Search strategies (NO INDEXING) ---
-        fun searchInRoot(root: VirtualFile): VirtualFile? {
-            var found: VirtualFile? = null
-
-            VfsUtilCore.visitChildrenRecursively(root, object : VirtualFileVisitor<Any>() {
-                override fun visitFile(file: VirtualFile): Boolean {
-                    if (!file.isDirectory && file.name.equals(cleanName, ignoreCase = true)) {
-                        found = file
-                        return false // stop recursion
-                    }
-                    return true
-                }
-            })
-
-            return found
+        val module = ModuleUtilCore.findModuleForFile(containingVF, project)
+        val moduleRoots = if (module != null) {
+            val modRootManager = ModuleRootManager.getInstance(module)
+            (modRootManager.contentRoots.toList() + modRootManager.getSourceRoots(true).toList()).distinct()
+        } else {
+            emptyList()
         }
 
-        val virtualFile =
-            // A. Relative to containing file (CRITICAL for ../../Lib/...)
-            parentDir?.findFileByRelativePath(targetPath)
-            // B. Search in module content roots
-                ?: allRoots.firstNotNullOfOrNull { it.findFileByRelativePath(targetPath) }
-                // C. Direct VFS walk in all module roots (NO index)
-                ?: allRoots.firstNotNullOfOrNull { searchInRoot(it) }
-                ?: return null
-                //DEBUG("    RESULT virtualFile='${virtualFile?.path}'")
-
-        // --- 5. Prevent recursive includes ---
-        val canonical = virtualFile.canonicalPath ?: virtualFile.path
-        if (canonical in visitedFiles) return null
-
-        // --- 6. Sync document ---
-        val doc = FileDocumentManager.getInstance().getDocument(virtualFile)
-        if (doc != null && PsiDocumentManager.getInstance(project).isUncommited(doc)) {
-            PsiDocumentManager.getInstance(project).commitDocument(doc)
-        }
-
-        // --- 7. Try PSI ---
-        val psiFile = PsiManager.getInstance(project).findFile(virtualFile)
-
-        // --- 8. Fallback PSI creation ---
-        if (psiFile == null) return null
-
-//        if (psiFile == null || psiFile.textLength == 0) {
-//            val rawContent = try {
-//                doc?.text ?: String(virtualFile.contentsToByteArray(), virtualFile.charset)
-//            } catch (_: Exception) {
-//                null
-//            }
-//
-//            if (!rawContent.isNullOrEmpty()) {
-//                psiFile = PsiFileFactory.getInstance(project).createFileFromText(
-//                    virtualFile.name,
-//                    virtualFile.fileType,
-//                    rawContent
-//                )
-//            }
-//        }
-
-        return psiFile
+        return (listOfNotNull(parentDir) + moduleRoots).distinct()
     }
 
     fun processLslpFile( virtualFile: VirtualFile, project: Project): VirtualFile? {
@@ -471,12 +358,13 @@ class LslPreprocessorEngine(private val project: Project) {
     // Main entry point for processing LSL files on project save
     fun processFileOnSave(virtualFile: VirtualFile) {
         if (project.isDisposed || !virtualFile.isValid) return
+
+        // Ignore files inside excluded directories
+        val fileIndex = ProjectRootManager.getInstance(project).fileIndex
+        if (fileIndex.isExcluded(virtualFile)) return
+
         val ext = virtualFile.extension?.lowercase() ?: return
-
         if (ext != "lslp" && ext != "lslm") return
-
-        // Empty log  file for DEBUG
-        //File("C:/temp/lsl_debug.txt").delete()
 
         val documentManager = PsiDocumentManager.getInstance(project)
         val fileDocumentManager = FileDocumentManager.getInstance()
@@ -488,26 +376,35 @@ class LslPreprocessorEngine(private val project: Project) {
             documentManager.commitAllDocuments()
         }
 
-        val scope = GlobalSearchScope.projectScope(project)
-        val allLslmFiles = FilenameIndex.getAllFilesByExt(project, "lslm", scope)
-        for (lslm in allLslmFiles) {
-            lslm.refresh(false, false)
-        }
-
-        //PsiManager.getInstance(project).dropPsiCaches()
+        // PsiManager.getInstance(project).dropPsiCaches()
 
         // 2. Process dependent files
         if (ext == "lslp") {
+            // Refresh ONLY the .lslm files explicitly included by this .lslp file
+//            val psiFile = virtualFile.toPsi() ?: return
+//            val referencedLslmFiles = LslIncludesCollector.getInstance(project).collectIncludedLslmFiles(
+//                file = psiFile
+//            )
+//
+//            for (lslmPsi in referencedLslmFiles) {
+//                lslmPsi.toVf()?.refresh(false, false)
+//            }
+            // Direct save on .lslp -> walkPreprocessorDirectives dynamically resolves all #includes
             processLslpFile(virtualFile, project)
         } else {
-            // Saving an .lslm header: re-run processing on all .lslp files.
-            val lslpFiles = FilenameIndex.getAllFilesByExt(project, "lslp", scope)
-            for (lslpFile in lslpFiles) {
+            // Saving an .lslm header: refresh itself first
+            virtualFile.refresh(false, false)
+
+            // Re-run processing ONLY on .lslp files that actually depend on this .lslm header
+            val dependentLslpFiles = LslIncludesCollector.getInstance(project)
+                .collectDependentLslpFiles(virtualFile)
+            //val dependentLslpFiles = collectDependentLslpFiles(virtualFile, project)
+            for (lslpFile in dependentLslpFiles) {
                 processLslpFile(lslpFile, project)
             }
         }
 
-        // Nnotify IntelliJ of project-wide PSI/macro updates
+        // Notify IntelliJ of project-wide PSI/macro updates
         project.messageBus
             .syncPublisher(PsiModificationTracker.TOPIC)
             .modificationCountChanged()
@@ -632,14 +529,14 @@ class LslPreprocessorEngine(private val project: Project) {
             for (item in section.items) {
                 when (item) {
                     is PreprocessedItem.FloatingComment -> {
-                        sb.append(item.text).append("\n\n")
+                        sb.appendLine(item.text).appendLine()
                     }
                     is PreprocessedItem.Declaration -> {
                         if (item.isSurviving) {
                             for (doc in item.docComments) {
-                                sb.append(doc).append("\n")
+                                sb.appendLine(doc)
                             }
-                            sb.append(item.psiElement.text).append("\n\n")
+                            sb.appendLine(item.psiElement.text).appendLine()
                         }
                     }
                     is PreprocessedItem.IncludeSection -> {
@@ -653,7 +550,7 @@ class LslPreprocessorEngine(private val project: Project) {
 
             if (!hasAny) {
                 val totalCount = section.items.filterIsInstance<PreprocessedItem.Declaration>().size
-                sb.append("// --- Consumed Include: ${section.fileName} ($totalCount items) ---\n\n")
+                sb.appendLine("// --- Consumed Include: ${section.fileName} ($totalCount items) ---").appendLine()
                 return
             }
 
@@ -665,7 +562,7 @@ class LslPreprocessorEngine(private val project: Project) {
                     element is LslGlobalVariable && (decl.isSurviving || element.name in usedConstantNames)
                 }
 
-                sb.append("// --- Begin Include: ${section.fileName} ($usedConsts constants, $usedFuncs functions used) ---\n")
+                sb.appendLine("// --- BEGIN INCLUDE: ${section.fileName} ($usedConsts constants, $usedFuncs functions used) ---")
 
                 for (item in section.items) {
                     when (item) {
@@ -673,9 +570,9 @@ class LslPreprocessorEngine(private val project: Project) {
                         is PreprocessedItem.Declaration -> {
                             if (item.isSurviving) {
                                 for (doc in item.docComments) {
-                                    sb.append(doc).append("\n")
+                                    sb.appendLine(doc)
                                 }
-                                sb.append(item.psiElement.text).append("\n\n")
+                                sb.appendLine(item.psiElement.text).appendLine()
                             }
                         }
                         is PreprocessedItem.IncludeSection -> {
@@ -685,8 +582,8 @@ class LslPreprocessorEngine(private val project: Project) {
                 }
                 val current = sb.toString().trimEnd()
                 sb.setLength(0)
-                sb.append(current).append("\n")
-                sb.append("// --- End Include: ${section.fileName} ---\n\n")
+                sb.appendLine(current)
+                sb.appendLine("// --- END INCLUDE: ${section.fileName} ---").appendLine()
             } else {
                 for (item in section.items) {
                     if (item is PreprocessedItem.IncludeSection) {
@@ -854,48 +751,53 @@ class LslPreprocessorEngine(private val project: Project) {
         }
 
         fun shortenPath(project: Project, path: String): String {
-            val base = project.basePath ?: return path
+            val base = project.basePath?.replace('\\', '/')?.trimEnd('/') ?: return path
+            val target = path.replace('\\', '/').trimEnd('/')
 
-            // Normalize separators for cross-platform safety
-            val normalizedBase = base.replace('\\', '/')
-            val normalizedPath = path.replace('\\', '/')
-
-            return if (normalizedPath.startsWith(normalizedBase)) {
-                val relative = normalizedPath.removePrefix(normalizedBase).trimStart('/')
-                "./$relative"
-            } else {
-                normalizedPath
+            // Exact match for project root folder (e.g., "K1000 DOOR")
+            if (target.equals(base, ignoreCase = true)) {
+                return base.substringAfterLast('/')
             }
+
+            // Inside project root (e.g., "K1000 DOOR/subfolder")
+            if (target.startsWith("$base/", ignoreCase = true)) {
+                return target.substring(base.length + 1)
+            }
+
+            // Sibling directory under common parent (e.g., "JetScripts/Lib")
+            val parentBase = base.substringBeforeLast('/', "")
+            if (parentBase.isNotEmpty() && target.startsWith("$parentBase/", ignoreCase = true)) {
+                return target.substring(parentBase.length + 1)
+            }
+
+            return target
         }
+
 
         val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(Date())
         val kwdbSourceInfo = KwdbData.getInstance(file.project).kwdbSourceInfo
-        val rootManager = ProjectRootManager.getInstance(project)
-        val contentRoots = rootManager.contentRoots.toList()
-        val sourceRoots = rootManager.contentSourceRoots.toList()
-        val allRoots = (contentRoots + sourceRoots).distinct()
 
-        sb.append("// ---------------------------------------------------------------\n")
-        sb.append("//  Generated by 'Linden Script (LSL)' Preprocessor\n")
-        sb.append("// ---------------------------------------------------------------\n")
-        sb.append("//  Source file            : $mainFileName\n")
-        sb.append("//  Generation time        : $timestamp\n")
-        sb.append("//  Constants optimization : ${if (isConstantsOptimized) "ON" else "OFF [debug]"} \n")
-        sb.append("//  Project                : ${project.name}\n")
-        if (allRoots.isNotEmpty()) {
-            // First root on the same line
-            sb.append("//  Content roots          : \\${shortenPath(project, allRoots[0].name)}\n")
-            // Remaining roots aligned below
-            for (i in 1 until allRoots.size) {
-                sb.append("//                           \\${shortenPath(project, allRoots[i].name)}\n")
-            }
-        } else {
-            sb.append("//  Content roots          : (none)\n")
+        // 1. Find the specific module that owns the file being compiled/processed
+        // File's parent directory comes FIRST, followed by module roots (no project-wide fallback)
+        val allRoots = getModuleAndRoots(file, project)
+
+        sb.appendLine("// ---------------------------------------------------------------")
+        sb.appendLine("//  Generated by 'Linden Script (LSL)' Preprocessor")
+        sb.appendLine("// ---------------------------------------------------------------")
+        sb.appendLine("//  Source file            : $mainFileName")
+        sb.appendLine("//  Generation time        : $timestamp")
+        sb.appendLine("//  Constants optimization : ${if (isConstantsOptimized) "ON" else "OFF [debug]"} ")
+        sb.appendLine("//  Project                : ${project.name}")
+        val rootsText = if (allRoots.isNotEmpty()) "\\${shortenPath(project, allRoots[0].path)}" else ""
+        sb.appendLine("//  Content roots          : $rootsText")
+        for (i in 1 until allRoots.size) {
+            sb.appendLine("//                           \\${shortenPath(project, allRoots[i].path)}")
         }
-        sb.append("// ---------------------------------------------------------------\n")
-        sb.append("//  LSL plugin version     : ${getPluginZip()}\n")
-        sb.append("//  Keyword database       : $kwdbSourceInfo\n")
-        sb.append("// ---------------------------------------------------------------\n\n")
+        sb.appendLine("// ---------------------------------------------------------------")
+        sb.appendLine("//  LSL plugin version     : ${getPluginZip()}")
+        sb.appendLine("//  Keyword database       : $kwdbSourceInfo")
+        sb.appendLine("// ---------------------------------------------------------------")
+        sb.appendLine()
 
         emitSection(rootSection, isRoot = true, sb = sb, usedConstantNames = usedConstantNames)
 
@@ -903,13 +805,11 @@ class LslPreprocessorEngine(private val project: Project) {
     }
 
 
-
-
     fun expandDirectives(
         file: PsiFile?,
         project: Project,
         definitions: MutableMap<String, String> = mutableMapOf(),
-        visitedFiles: Set<String> = emptySet(),
+        visitedFiles: MutableSet<String> = mutableSetOf(),
         depth: Int = 0,
         markIncludes: Boolean = false,
         includeCounter: AtomicInteger = AtomicInteger(0)
@@ -917,6 +817,7 @@ class LslPreprocessorEngine(private val project: Project) {
         if (file == null || !file.isValid) return ""
         if (project.isDisposed) return ""
 
+        //val path = file.virtualFile?.path ?: file.name
         val result = StringBuilder()
 
         walkPreprocessorDirectives(
@@ -928,13 +829,15 @@ class LslPreprocessorEngine(private val project: Project) {
                 depth = depth,
                 markIncludes = markIncludes,
                 includeCounter = includeCounter,
-                onNormalLine = { lineText -> result.append(lineText).append("\n") },
-                onInlineDirective = { rawArgs ->
-                    result.append("// __LSL_INLINE__\n")
-                    if (rawArgs.trim().isNotEmpty()) result.append(rawArgs.trim()).append("\n")
-                },
-                onIncludeResolved = { includedPsi, ctx ->
 
+                onNormalLine = { lineText -> result.appendLine(lineText) },
+
+                onInlineDirective = { rawArgs ->
+                    result.appendLine("// __LSL_INLINE__")
+                    if (rawArgs.trim().isNotEmpty()) result.appendLine(rawArgs.trim())
+                },
+
+                onIncludeResolved = { includedPsi, ctx ->
                     val code = expandDirectives(
                         includedPsi,
                         ctx.project,
@@ -944,36 +847,18 @@ class LslPreprocessorEngine(private val project: Project) {
                         ctx.markIncludes,
                         ctx.includeCounter
                     )
-                    //DEBUG("expandDirectives include '${includedPsi.name}' -> length=${code.length}")
 
                     if (ctx.markIncludes) {
                         val id = ctx.includeCounter.incrementAndGet()
                         val incName = includedPsi.name
-                        result.append("// __LSL_INC_START__:$id:$incName\n")
-                        val code = expandDirectives(
-                            includedPsi,
-                            ctx.project,
-                            ctx.definitions,
-                            ctx.visitedFiles,
-                            ctx.depth + 1,
-                            true,
-                            ctx.includeCounter
-                        )
-                        if (code.isNotEmpty()) result.append(code).append("\n")
-                        result.append("// __LSL_INC_END__:$id:$incName\n")
+                        result.appendLine("// __LSL_INC_START__:$id:$incName")
+                        if (code.isNotEmpty()) result.appendLine(code)
+                        result.appendLine("// __LSL_INC_END__:$id:$incName")
                     } else {
-                        val code = expandDirectives(
-                            includedPsi,
-                            ctx.project,
-                            ctx.definitions,
-                            ctx.visitedFiles,
-                            ctx.depth + 1,
-                            false,
-                            ctx.includeCounter
-                        )
-                        if (code.isNotEmpty()) result.append(code).append("\n")
+                        if (code.isNotEmpty()) result.appendLine(code)
                     }
                 }
+
             )
         )
 
@@ -1003,8 +888,10 @@ class LslPreprocessorEngine(private val project: Project) {
                         }
                     }
                 },
-                onIncludeResolved = { includedPsi, ctx ->
-                    collectDefinitionsFromInclude(includedPsi, includedPsi.project, ctx.definitions, ctx.visitedFiles, 0)
+                onIncludeResolved = { includedPsi, childCtx ->
+                    collectDefinitionsFromInclude(
+                        childCtx.copy(file = includedPsi)
+                    )
                 }
             )
         )
@@ -1012,216 +899,23 @@ class LslPreprocessorEngine(private val project: Project) {
         return mergeContiguousRanges(rawDisabledRanges)
     }
 
-    fun annotateIncludes(file: PsiFile?, holder: AnnotationHolder) {
-        if (file == null || !file.isValid) return
-        // Here we use the file's project
-        if (file.project.isDisposed) return
 
-        val document = PsiDocumentManager.getInstance(file.project).getDocument(file)
-
-        walkPreprocessorDirectives(
-            PreprocessorContext(
-                file = file,
-                project = file.project,
-                onIncludeFailed = { includedPath, lineNumber ->
-                    val lineIndex = lineNumber - 1
-                    val range = if (document != null && lineIndex in 0 until document.lineCount) {
-                        TextRange(document.getLineStartOffset(lineIndex), document.getLineEndOffset(lineIndex))
-                    } else {
-                        file.textRange
-                    }
-
-                    holder.newAnnotation(HighlightSeverity.ERROR, "Cannot resolve include file '$includedPath'")
-                        .range(range)
-                        .create()
-                },
-                onIncludeResolved = { includedPsi, ctx ->
-                    collectIncludedFiles(includedPsi, file.project, ctx.visitedFiles, ctx.depth + 1)
-                }
-            )
-        )
-    }
-
-    fun collectIncludedFiles(
-        file: PsiFile?,
-        project: Project,
-        visitedFiles: Set<String> = emptySet(),
-        depth: Int = 0
-    ): Set<PsiFile> {
-        if (file == null || !file.isValid || depth > MAX_INCLUDE_DEPTH || project.isDisposed) return emptySet()
-
-        val result = mutableSetOf<PsiFile>()
-
-        walkPreprocessorDirectives(
-            PreprocessorContext(
-                file = file,
-                project = project,
-                visitedFiles = visitedFiles,
-                depth = depth,
-                onIncludeResolved = { includedPsi, ctx ->
-                    if (result.add(includedPsi)) {
-                        val childIncludes =
-                            collectIncludedFiles(includedPsi, project, ctx.visitedFiles, ctx.depth + 1)
-                        result.addAll(childIncludes)
-                        //DEBUG("Collected file: ${includedPsi.name}")
-                    }
-                }
-            )
-        )
-
-        return result
-    }
 
     fun collectDefinitionsFromInclude(
-        file: PsiFile?,
-        project: Project,
-        definitions: MutableMap<String, String>,
-        visitedFiles: Set<String> = emptySet(),
-        depth: Int = 0
+        ctx: PreprocessorContext
     ) {
-        if (file == null || !file.isValid || depth > MAX_INCLUDE_DEPTH || project.isDisposed) return
+        val file = ctx.file
+        if (file == null || !file.isValid || ctx.depth > MAX_INCLUDE_DEPTH || ctx.project.isDisposed) return
 
         walkPreprocessorDirectives(
-            PreprocessorContext(
-                file = file,
-                project = project,
-                definitions = definitions,
-                visitedFiles = visitedFiles,
-                depth = depth,
-                onIncludeResolved = { includedPsi, ctx ->
+            ctx.copy(
+                onIncludeResolved = { includedPsi, childCtx ->
                     collectDefinitionsFromInclude(
-                        includedPsi,
-                        ctx.project,
-                        ctx.definitions,
-                        ctx.visitedFiles,
-                        ctx.depth + 1
+                        childCtx.copy(file = includedPsi)
                     )
                 }
             )
         )
-    }
-
-    fun eliminateDeadCode( project: Project, code: String): String {
-        val trimmedCode = code.trim()
-        if (trimmedCode.isEmpty() || project.isDisposed) return ""
-        val psiFile = runCatching { LslElementFactory.createFile(project, code) }.getOrNull() ?: return code
-
-        val allFunctions = mutableListOf<LslFunction>()
-        val allGlobals = mutableListOf<LslGlobalVariable>()
-        val allStates = mutableListOf<LslState>()
-
-        val functionsByName = mutableMapOf<String, MutableList<LslFunction>>()
-        val globalsByName = mutableMapOf<String, MutableList<LslGlobalVariable>>()
-        val statesByName = mutableMapOf<String, MutableList<LslState>>()
-
-        // 1. Single-pass categorisation of top-level elements
-        for (child in psiFile.children) {
-            when (child) {
-                is LslFunction -> {
-                    allFunctions.add(child)
-                    child.name?.let { functionsByName.getOrPut(it) { mutableListOf() }.add(child) }
-                }
-                is LslGlobalVariable -> {
-                    allGlobals.add(child)
-                    child.name?.let { globalsByName.getOrPut(it) { mutableListOf() }.add(child) }
-                }
-                is LslState -> {
-                    allStates.add(child)
-                    child.name?.let { statesByName.getOrPut(it) { mutableListOf() }.add(child) }
-                }
-            }
-        }
-
-        val visitedStates = mutableSetOf<LslState>()
-        val visitedFunctions = mutableSetOf<LslFunction>()
-        val visitedGlobals = mutableSetOf<LslGlobalVariable>()
-        val queue = ArrayDeque<PsiElement>()
-
-        for (state in allStates) {
-            visitedStates.add(state)
-            queue.addAll(state.events)
-        }
-
-        // 2. Single-visitor traversal per queued element (replaces 3 separate PsiTreeUtil sweeps)
-        while (queue.isNotEmpty()) {
-            val element = queue.removeFirst()
-
-            element.accept(object : PsiRecursiveElementWalkingVisitor() {
-                override fun visitElement(element: PsiElement) {
-                    when (element) {
-                        is LslExpressionFunctionCall -> {
-                            element.functionName?.let { name ->
-                                functionsByName[name]?.forEach { func ->
-                                    if (visitedFunctions.add(func)) queue.add(func)
-                                }
-                            }
-                        }
-                        is LslLValue -> {
-                            element.variableName?.let { varName ->
-                                val globals = globalsByName[varName]
-                                if (!globals.isNullOrEmpty() && !isShadowedLocally(element, varName)) {
-                                    globals.forEach { globalVar ->
-                                        if (visitedGlobals.add(globalVar)) queue.add(globalVar)
-                                    }
-                                }
-                            }
-                        }
-                        is LslStatementState -> {
-                            element.stateName?.let { targetStateName ->
-                                statesByName[targetStateName]?.forEach { targetState ->
-                                    if (visitedStates.add(targetState)) {
-                                        queue.addAll(targetState.events)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    super.visitElement(element)
-                }
-            })
-        }
-
-        // 3. Collect unvisited (dead) elements
-        val deadElements = mutableSetOf<PsiElement>()
-        for (func in allFunctions) if (func !in visitedFunctions) deadElements.add(func)
-        for (global in allGlobals) if (global !in visitedGlobals) deadElements.add(global)
-
-        if (deadElements.isEmpty()) return code
-
-        // 4. Delete dead PSI nodes directly & return single clean formatted text
-        deadElements.forEach { it.delete() }
-        return psiFile.text.trim()
-    }
-
-
-
-    private fun adjustRangeToDelete(text: String, startOffset: Int, endOffset: Int): Pair<Int, Int> {
-        var start = startOffset
-        var end = endOffset
-
-        var lineStart = start
-        while (lineStart > 0 && text[lineStart - 1] != '\n' && text[lineStart - 1] != '\r') {
-            if (!text[lineStart - 1].isWhitespace()) {
-                lineStart = -1
-                break
-            }
-            lineStart--
-        }
-        if (lineStart >= 0) start = lineStart
-
-        var lineEnd = end
-        while (lineEnd < text.length && (text[lineEnd] == ' ' || text[lineEnd] == '\t')) {
-            lineEnd++
-        }
-        if (lineEnd < text.length && text[lineEnd] == '\r') lineEnd++
-        if (lineEnd < text.length && text[lineEnd] == '\n') {
-            lineEnd++
-            end = lineEnd
-        } else if (lineEnd == text.length) {
-            end = lineEnd
-        }
-
-        return Pair(start, end)
     }
 
     data class InliningResult(
@@ -1321,11 +1015,6 @@ class LslPreprocessorEngine(private val project: Project) {
 
         else -> null
     }
-
-    fun evaluateConstantExpr(
-        expr: PsiElement?,
-        resolvedConstants: Map<String, ConstantValue> = emptyMap()
-    ): ConstantValue? = evaluateConstantExpression(expr, resolvedConstants)
 
     fun evaluateConstantExpression(
         expr: PsiElement?,
@@ -2140,10 +1829,14 @@ class LslPreprocessorEngine(private val project: Project) {
 
                 if (lineStart in 0..sbCode.length && range.endOffset in 0..sbCode.length) {
                     val singleLineSignature = func.text.lines().firstOrNull()?.trim() ?: func.name
-                    val blockText =
-                        indent + "// --- begin-inline: $singleLineSignature\n" +
-                                stmts.joinToString("\n") { indent + it } +
-                                "\n" + indent + "// --- end-inline: ${func.name}"
+//                    val blockText =
+//                        indent + "// --- BEGIN INLINE: $singleLineSignature ---\n" +
+//                                stmts.joinToString("\n") { indent + it } + "\n" + indent + "// --- END INLINE: ${func.name} ---"
+                    val blockText = buildString {
+                        appendLine("$indent// --- BEGIN INLINE: $singleLineSignature ---")
+                        appendLine(stmts.joinToString("\n") { "$indent$it" })
+                        appendLine("$indent// --- END INLINE: ${func.name} ---")
+                    }
 
                     sbCode.replace(lineStart, range.endOffset, blockText)
                 }
@@ -2319,278 +2012,4 @@ class LslPreprocessorEngine(private val project: Project) {
         return merged
     }
 
-    enum class TokenType {
-        LPAREN, RPAREN, OR, AND, EQ, NOT_EQ, NOT, IDENTIFIER, STRING, NUMBER
-    }
-
-    data class Token(val type: TokenType, val text: String)
-
-    private fun tokenize(input: String): List<Token> {
-        val tokens = mutableListOf<Token>()
-        var i = 0
-        val n = input.length
-        while (i < n) {
-            val c = input[i]
-            when {
-                c.isWhitespace() -> i++
-                c == '(' -> { tokens.add(Token(TokenType.LPAREN, "(")); i++ }
-                c == ')' -> { tokens.add(Token(TokenType.RPAREN, ")")); i++ }
-                c == '|' -> {
-                    if (i + 1 < n && input[i + 1] == '|') {
-                        tokens.add(Token(TokenType.OR, "||"))
-                        i += 2
-                    } else {
-                        tokens.add(Token(TokenType.OR, "|"))
-                        i++
-                    }
-                }
-                c == '&' -> {
-                    if (i + 1 < n && input[i + 1] == '&') {
-                        tokens.add(Token(TokenType.AND, "&&"))
-                        i += 2
-                    } else {
-                        tokens.add(Token(TokenType.AND, "&"))
-                        i++
-                    }
-                }
-                c == '=' -> {
-                    if (i + 1 < n && input[i + 1] == '=') {
-                        tokens.add(Token(TokenType.EQ, "=="))
-                        i += 2
-                    } else {
-                        tokens.add(Token(TokenType.EQ, "="))
-                        i++
-                    }
-                }
-                c == '!' -> {
-                    if (i + 1 < n && input[i + 1] == '=') {
-                        tokens.add(Token(TokenType.NOT_EQ, "!="))
-                        i += 2
-                    } else {
-                        tokens.add(Token(TokenType.NOT, "!"))
-                        i++
-                    }
-                }
-                c == '"' -> {
-                    val sb = StringBuilder()
-                    i++
-                    while (i < n && input[i] != '"') {
-                        if (input[i] == '\\' && i + 1 < n) i++
-                        sb.append(input[i])
-                        i++
-                    }
-                    if (i < n && input[i] == '"') i++
-                    tokens.add(Token(TokenType.STRING, sb.toString()))
-                }
-                c.isDigit() -> {
-                    val sb = StringBuilder()
-                    while (i < n && (input[i].isDigit() || input[i] == 'x' || input[i] == 'X' || input[i] in 'a'..'f' || input[i] in 'A'..'F')) {
-                        sb.append(input[i])
-                        i++
-                    }
-                    tokens.add(Token(TokenType.NUMBER, sb.toString()))
-                }
-                c.isJavaIdentifierStart() || c == '_' -> {
-                    val sb = StringBuilder()
-                    while (i < n && (input[i].isJavaIdentifierPart() || input[i] == '_')) {
-                        sb.append(input[i])
-                        i++
-                    }
-                    tokens.add(Token(TokenType.IDENTIFIER, sb.toString()))
-                }
-                else -> i++
-            }
-        }
-        return tokens
-    }
-
-    private fun stripTrailingComment(text: String): String {
-        val lineCommentIdx = text.indexOf("//")
-        var cleaned = if (lineCommentIdx != -1) text.substring(0, lineCommentIdx) else text
-        val blockCommentIdx = cleaned.indexOf("/*")
-        if (blockCommentIdx != -1) {
-            cleaned = cleaned.substring(0, blockCommentIdx)
-        }
-        return cleaned.trim()
-    }
-
-    fun parseAndAddDefine(args: String, definitions: MutableMap<String, String>) {
-        var cleanArgs = args.trim()
-        if (cleanArgs.isEmpty()) return
-        if (cleanArgs.startsWith("#")) {
-            cleanArgs = cleanArgs.removePrefix("#").trim()
-        }
-        if (cleanArgs.startsWith("define", ignoreCase = true)) {
-            cleanArgs = cleanArgs.substring(6).trim()
-        }
-        if (cleanArgs.isEmpty()) return
-        val equalIdx = cleanArgs.indexOf('=')
-        if (equalIdx != -1) {
-            val key = cleanArgs.substring(0, equalIdx).trim().substringBefore('(').trim()
-            val value = cleanArgs.substring(equalIdx + 1).trim()
-            if (key.isNotEmpty()) {
-                definitions[key] = value
-            }
-        } else {
-            val parts = cleanArgs.split(Regex("""\s+"""), limit = 2)
-            val key = parts[0].trim().substringBefore('(').trim()
-            val value = if (parts.size > 1) parts[1].trim() else "1"
-            if (key.isNotEmpty()) {
-                definitions[key] = value
-            }
-        }
-    }
-
-    private sealed class ExprValue {
-        data class BoolVal(val value: Boolean) : ExprValue()
-        data class NumVal(val value: Long) : ExprValue()
-        data class StrVal(val value: String) : ExprValue()
-        data class IdentVal(val name: String) : ExprValue()
-        object Undefined : ExprValue()
-
-        fun toBoolean(): Boolean = when (this) {
-            is BoolVal -> value
-            is NumVal -> value != 0L
-            is StrVal -> value.isNotEmpty() && value != "0" && !value.equals("false", ignoreCase = true)
-            is IdentVal, Undefined -> false
-        }
-
-        fun toNormalizedString(): String = when (this) {
-            is BoolVal -> value.toString()
-            is NumVal -> value.toString()
-            is StrVal -> value
-            is IdentVal -> name
-            Undefined -> ""
-        }
-    }
-
-    private class ExpressionParser(
-        private val tokens: List<Token>,
-        private val definitions: Map<String, String>
-    ) {
-        private var pos = 0
-
-        private fun peek(): Token? = if (pos < tokens.size) tokens[pos] else null
-        private fun previous(): Token = tokens[pos - 1]
-        private fun check(type: TokenType): Boolean = peek()?.type == type
-
-        private fun match(vararg types: TokenType): Boolean {
-            for (type in types) {
-                if (check(type)) {
-                    pos++
-                    return true
-                }
-            }
-            return false
-        }
-
-        private fun consume(type: TokenType): Token {
-            if (check(type)) return tokens[pos++]
-            throw IllegalArgumentException("Expected $type but got ${peek()?.type}")
-        }
-
-        fun parse(): Boolean {
-            if (tokens.isEmpty()) return false
-            return parseOr().toBoolean()
-        }
-
-        private fun parseOr(): ExprValue {
-            var left = parseAnd()
-            while (match(TokenType.OR)) {
-                val right = parseAnd()
-                left = ExprValue.BoolVal(left.toBoolean() || right.toBoolean())
-            }
-            return left
-        }
-
-        private fun parseAnd(): ExprValue {
-            var left = parseEquality()
-            while (match(TokenType.AND)) {
-                val right = parseEquality()
-                left = ExprValue.BoolVal(left.toBoolean() && right.toBoolean())
-            }
-            return left
-        }
-
-        private fun parseEquality(): ExprValue {
-            var left = parseUnary()
-            while (match(TokenType.EQ, TokenType.NOT_EQ)) {
-                val op = previous().type
-                val right = parseUnary()
-                val eq = areEqual(left, right)
-                left = ExprValue.BoolVal(if (op == TokenType.EQ) eq else !eq)
-            }
-            return left
-        }
-
-        private fun parseUnary(): ExprValue {
-            if (match(TokenType.NOT)) {
-                val right = parseUnary()
-                return ExprValue.BoolVal(!right.toBoolean())
-            }
-            return parsePrimary()
-        }
-
-        private fun parsePrimary(): ExprValue {
-            if (match(TokenType.LPAREN)) {
-                val expr = parseOr()
-                consume(TokenType.RPAREN)
-                return expr
-            }
-
-            if (match(TokenType.NUMBER)) {
-                val text = previous().text
-                val num = if (text.startsWith("0x", ignoreCase = true)) {
-                    text.substring(2).toLongOrNull(16) ?: 0L
-                } else {
-                    text.toLongOrNull() ?: 0L
-                }
-                return ExprValue.NumVal(num)
-            }
-
-            if (match(TokenType.STRING)) {
-                return ExprValue.StrVal(previous().text)
-            }
-
-            if (match(TokenType.IDENTIFIER)) {
-                val ident = previous().text
-                if (ident == "defined") {
-                    val hasParen = match(TokenType.LPAREN)
-                    if (check(TokenType.IDENTIFIER)) {
-                        val target = consume(TokenType.IDENTIFIER).text
-                        if (hasParen) consume(TokenType.RPAREN)
-                        return ExprValue.BoolVal(definitions.containsKey(target))
-                    }
-                    return ExprValue.BoolVal(false)
-                }
-                if (ident.equals("true", ignoreCase = true)) return ExprValue.BoolVal(true)
-                if (ident.equals("false", ignoreCase = true)) return ExprValue.BoolVal(false)
-
-                if (definitions.containsKey(ident)) {
-                    val rawVal = definitions[ident]?.trim() ?: ""
-                    val unquoted = rawVal.removeSurrounding("\"")
-                    val num = unquoted.toLongOrNull()
-                    return when {
-                        num != null -> ExprValue.NumVal(num)
-                        unquoted.equals("true", ignoreCase = true) -> ExprValue.BoolVal(true)
-                        unquoted.equals("false", ignoreCase = true) -> ExprValue.BoolVal(false)
-                        else -> ExprValue.StrVal(unquoted)
-                    }
-                } else {
-                    return ExprValue.IdentVal(ident)
-                }
-            }
-
-            return ExprValue.Undefined
-        }
-
-        private fun areEqual(a: ExprValue, b: ExprValue): Boolean {
-            if (a is ExprValue.NumVal && b is ExprValue.NumVal) {
-                return a.value == b.value
-            }
-            val s1 = a.toNormalizedString()
-            val s2 = b.toNormalizedString()
-            return s1 == s2
-        }
-    }
 }

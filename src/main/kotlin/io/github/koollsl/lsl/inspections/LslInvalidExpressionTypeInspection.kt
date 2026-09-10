@@ -1,6 +1,10 @@
 package io.github.koollsl.lsl.inspections
 
-import com.intellij.codeInspection.*
+import com.intellij.codeInspection.LocalInspectionTool
+import com.intellij.codeInspection.LocalQuickFixOnPsiElement
+import com.intellij.codeInspection.ProblemHighlightType
+import com.intellij.codeInspection.ProblemsHolder
+import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.TextRange
 import com.intellij.psi.PsiElement
@@ -13,21 +17,22 @@ import io.github.koollsl.lsl.preprocessor.LslPreprocessorEngine
 import io.github.koollsl.lsl.psi.*
 
 class LslInvalidExpressionTypeInspection : LocalInspectionTool() {
-
     override fun getDisplayName(): String = "Invalid expression type"
     override fun getGroupDisplayName(): String = LslLanguage.INSTANCE.displayName
     override fun isEnabledByDefault(): Boolean = true
     override fun getStaticDescription(): String = "Invalid expression type"
 
     override fun buildVisitor(holder: ProblemsHolder, isOnTheFly: Boolean): PsiElementVisitor {
+        // 1. Fetch file and preprocessor engine ONCE per inspection pass
         val file = holder.file
-        val preprocessorEngine = file.project.getService(LslPreprocessorEngine::class.java)
+        val preprocessorEngine = holder.project.service<LslPreprocessorEngine>()
 
         return object : LslElementVisitor() {
 
             // 1. Local Variable Initializations
             override fun visitStatementVariable(variable: LslStatementVariable) {
                 if (preprocessorEngine.isDisabledText(file, variable.textRange)) return
+
                 val declaredType = variable.lslType
                 val initializer = variable.expression ?: return
 
@@ -48,6 +53,7 @@ class LslInvalidExpressionTypeInspection : LocalInspectionTool() {
             // 2. Global Variable Initializations
             override fun visitGlobalVariable(variable: LslGlobalVariable) {
                 if (preprocessorEngine.isDisabledText(file, variable.textRange)) return
+
                 val declaredType = variable.lslType
                 val initializer = variable.expression ?: return
 
@@ -65,109 +71,115 @@ class LslInvalidExpressionTypeInspection : LocalInspectionTool() {
                 }
             }
 
-            // Router for PSI elements without dedicated visit methods in LslElementVisitor
-            override fun visitElement(element: PsiElement) {
-                super.visitElement(element)
-                if (preprocessorEngine.isDisabledText(file, element.textRange)) return
+            // 3. Binary Expressions
+            override fun visitExpressionBinary(expression: LslExpressionBinary) {
+                if (preprocessorEngine.isDisabledText(file, expression.textRange)) return
 
-                when (element) {
-                    // 3. Binary Expressions
-                    is LslExpressionBinary -> {
-                        val typeLeft = element.expressionLeft?.lslType ?: LslPrimitiveType.INVALID
-                        val typeRight = element.expressionRight?.lslType ?: LslPrimitiveType.INVALID
+                val typeLeft = expression.expressionLeft?.lslType ?: LslPrimitiveType.INVALID
+                val typeRight = expression.expressionRight?.lslType ?: LslPrimitiveType.INVALID
 
-                        if (typeLeft != LslPrimitiveType.INVALID && typeRight != LslPrimitiveType.INVALID &&
-                            typeLeft.operationTo(typeRight, element.operator) == LslPrimitiveType.INVALID
-                        ) {
-                            val expressionRight = element.expressionRight
-                            val fixes = listOfNotNull(
-                                expressionRight?.let { TypeCastFix(it, typeLeft) }
-                            ).toTypedArray()
+                if (typeLeft != LslPrimitiveType.INVALID && typeRight != LslPrimitiveType.INVALID &&
+                    typeLeft.operationTo(typeRight, expression.operator) == LslPrimitiveType.INVALID
+                ) {
+                    val expressionRight = expression.expressionRight
+                    val fixes = listOfNotNull(
+                        expressionRight?.let { TypeCastFix(it, typeLeft) }
+                    ).toTypedArray()
 
-                            holder.registerProblem(
-                                element,
-                                "Type mismatch (expected %s, got %s)".format(typeLeft, typeRight),
-                                ProblemHighlightType.GENERIC_ERROR,
-                                TextRange(0, element.textLength),
-                                *fixes
-                            )
-                        }
-                    }
-
-                    // 4. Vector Components
-                    is LslExpressionVector -> {
-                        element.expressions.forEach { component ->
-                            val expressionType = component.lslType
-                            if (expressionType != LslPrimitiveType.INVALID &&
-                                LslPrimitiveType.FLOAT.operationTo(expressionType, LslTypes.ASSIGN) == LslPrimitiveType.INVALID
-                            ) {
-                                holder.registerProblem(
-                                    component,
-                                    "Type mismatch (expected float, got %s)".format(expressionType),
-                                    ProblemHighlightType.GENERIC_ERROR,
-                                    TextRange(0, component.textLength),
-                                    TypeCastFix(component, LslPrimitiveType.FLOAT)
-                                )
-                            }
-                        }
-                    }
-
-                    // 5. Rotation/Quaternion Components
-                    is LslExpressionQuaternion -> {
-                        element.expressions.forEach { component ->
-                            val expressionType = component.lslType
-                            if (expressionType != LslPrimitiveType.INVALID &&
-                                LslPrimitiveType.FLOAT.operationTo(expressionType, LslTypes.ASSIGN) == LslPrimitiveType.INVALID
-                            ) {
-                                holder.registerProblem(
-                                    component,
-                                    "Type mismatch (expected float, got %s)".format(expressionType),
-                                    ProblemHighlightType.GENERIC_ERROR,
-                                    TextRange(0, component.textLength),
-                                    TypeCastFix(component, LslPrimitiveType.FLOAT)
-                                )
-                            }
-                        }
-                    }
-
-                    // 6. Assignments in Conditions (if, while, do-while)
-                    is LslStatementIf -> checkConditionForAssignment(element.condition)
-                    is LslStatementWhile -> checkConditionForAssignment(element.condition)
-                    is LslStatementDo -> checkConditionForAssignment(element.condition)
+                    holder.registerProblem(
+                        expression,
+                        "Type mismatch (expected %s, got %s)".format(typeLeft, typeRight),
+                        ProblemHighlightType.GENERIC_ERROR,
+                        TextRange(0, expression.textLength),
+                        *fixes
+                    )
                 }
             }
 
-            private fun checkConditionForAssignment(condition: PsiElement?) {
-                if (condition == null || preprocessorEngine.isDisabledText(file, condition.textRange)) return
+            // 4. Vector Components
+            override fun visitExpressionVector(expression: LslExpressionVector) {
+                if (preprocessorEngine.isDisabledText(file, expression.textRange)) return
 
-                val queue = ArrayDeque<PsiElement>()
-                queue.add(condition)
-
-                while (queue.isNotEmpty()) {
-                    val current = queue.removeFirst()
-
-                    val isAssignment = when (current) {
-                        is LslExpressionBinary -> current.operator == LslTypes.ASSIGN
-                        is LslExpressionAssignment -> true
-                        else -> false
-                    }
-
-                    if (isAssignment) {
-                        holder.registerProblem(
-                            current,
-                            "Assignment in condition (did you mean '=='?)",
-                            ProblemHighlightType.GENERIC_ERROR_OR_WARNING,
-                            TextRange(0, current.textLength)
-                        )
-                    }
-
-                    queue.addAll(current.children)
+                expression.expressions.forEach { component ->
+                    checkComponentType(component, holder)
                 }
+            }
+
+            // 5. Rotation/Quaternion Components
+            override fun visitExpressionQuaternion(expression: LslExpressionQuaternion) {
+                if (preprocessorEngine.isDisabledText(file, expression.textRange)) return
+
+                expression.expressions.forEach { component ->
+                    checkComponentType(component, holder)
+                }
+            }
+
+            // 6. Assignments in Conditions (if, while, do-while)
+            override fun visitStatementIf(statement: LslStatementIf) {
+                if (preprocessorEngine.isDisabledText(file, statement.textRange)) return
+                checkConditionForAssignment(statement.condition, holder)
+            }
+
+            override fun visitStatementWhile(statement: LslStatementWhile) {
+                if (preprocessorEngine.isDisabledText(file, statement.textRange)) return
+                checkConditionForAssignment(statement.condition, holder)
+            }
+
+            override fun visitStatementDo(statement: LslStatementDo) {
+                if (preprocessorEngine.isDisabledText(file, statement.textRange)) return
+                checkConditionForAssignment(statement.condition, holder)
             }
         }
     }
 
-    class TypeCastFix(expression: LslExpression, val type: LslPrimitiveType) : LocalQuickFixOnPsiElement(expression) {
+    private fun checkComponentType(component: LslExpression, holder: ProblemsHolder) {
+        val expressionType = component.lslType
+        if (expressionType != LslPrimitiveType.INVALID &&
+            LslPrimitiveType.FLOAT.operationTo(expressionType, LslTypes.ASSIGN) == LslPrimitiveType.INVALID
+        ) {
+            holder.registerProblem(
+                component,
+                "Type mismatch (expected float, got %s)".format(expressionType),
+                ProblemHighlightType.GENERIC_ERROR,
+                TextRange(0, component.textLength),
+                TypeCastFix(component, LslPrimitiveType.FLOAT)
+            )
+        }
+    }
+
+    private fun checkConditionForAssignment(condition: PsiElement?, holder: ProblemsHolder) {
+        if (condition == null) return
+
+        val queue = ArrayDeque<PsiElement>()
+        queue.add(condition)
+
+        while (queue.isNotEmpty()) {
+            val current = queue.removeFirst()
+
+            val isAssignment = when (current) {
+                is LslExpressionBinary -> current.operator == LslTypes.ASSIGN
+                is LslExpressionAssignment -> true
+                else -> false
+            }
+
+            if (isAssignment) {
+                holder.registerProblem(
+                    current,
+                    "Assignment in condition (did you mean '=='?)",
+                    ProblemHighlightType.GENERIC_ERROR_OR_WARNING,
+                    TextRange(0, current.textLength)
+                )
+            }
+
+            queue.addAll(current.children)
+        }
+    }
+
+    class TypeCastFix(
+        expression: LslExpression,
+        private val type: LslPrimitiveType
+    ) : LocalQuickFixOnPsiElement(expression) {
+
         override fun getFamilyName(): String = "Cast to $type"
         override fun getText(): String = familyName
 

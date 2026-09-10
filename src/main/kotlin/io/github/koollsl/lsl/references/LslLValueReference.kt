@@ -4,9 +4,8 @@ import com.intellij.openapi.components.service
 import com.intellij.openapi.util.TextRange
 import com.intellij.psi.*
 import com.intellij.psi.impl.source.resolve.ResolveCache
-import com.intellij.psi.search.FilenameIndex
-import com.intellij.psi.search.GlobalSearchScope
 import io.github.koollsl.lsl.KwdbData
+import io.github.koollsl.lsl.preprocessor.LslIncludesCollector
 import io.github.koollsl.lsl.preprocessor.LslPreprocessorEngine
 import io.github.koollsl.lsl.psi.*
 
@@ -79,7 +78,7 @@ class LslLValueReference(val element: LslLValue) :
                         .map { PsiElementResolveResult(it) }
 
                     // 2. Included file globals
-                    val includedFiles = engine.getIncludedFiles(node)
+                    val includedFiles = LslIncludesCollector.getInstance(project).getIncludedFiles(node)
                     val includedGlobals = includedFiles.flatMap { file ->
                         (file as? LslFile)?.children
                             ?.filterIsInstance<LslGlobalVariable>()
@@ -88,25 +87,26 @@ class LslLValueReference(val element: LslLValue) :
                             ?: emptyList()
                     }
 
+                    // Not needed, and it is laggy! Included files are enough scope
                     // 3. Workspace library globals (.lslp / .lslm)
-                    val lslpVirtualFiles = listOf("lslp", "lslm").flatMap { ext ->
-                        FilenameIndex.getAllFilesByExt(project, ext, GlobalSearchScope.projectScope(project))
-                    }
-                    val lslpGlobals = lslpVirtualFiles.flatMap { virtualFile ->
-                        val psiFile = PsiManager.getInstance(project).findFile(virtualFile) as? LslFile
-                        psiFile?.children
-                            ?.filterIsInstance<LslGlobalVariable>()
-                            ?.filter { it.name == element.variableName }
-                            ?.map { PsiElementResolveResult(it) }
-                            ?: emptyList()
-                    }
+//                    val lslpVirtualFiles = listOf("lslp", "lslm").flatMap { ext ->
+//                        FilenameIndex.getAllFilesByExt(project, ext, GlobalSearchScope.projectScope(project))
+//                    }
+//                    val lslpGlobals = lslpVirtualFiles.flatMap { virtualFile ->
+//                        val psiFile = PsiManager.getInstance(project).findFile(virtualFile) as? LslFile
+//                        psiFile?.children
+//                            ?.filterIsInstance<LslGlobalVariable>()
+//                            ?.filter { it.name == element.variableName }
+//                            ?.map { PsiElementResolveResult(it) }
+//                            ?: emptyList()
+//                    }
 
                     // 4. Built‑in constants
                     val builtinConstants = listOfNotNull(
                         KwdbData.getInstance(project).constants[element.variableName]
                     ).map { PsiElementResolveResult(it) }
 
-                    return (result + localGlobals + includedGlobals + lslpGlobals + builtinConstants)
+                    return (result + localGlobals + includedGlobals + builtinConstants)
                         .toTypedArray()
                 }
             }

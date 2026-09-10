@@ -17,26 +17,33 @@ class LslColorSettingsPage : ColorSettingsPage {
     override fun getDemoText(): String =
         """
         // Line comment
-        /* Block
-           comment */
+        /* Block comment */
 
-        <type>vector</type> gPosition = <builtin_constant>ZERO_VECTOR</builtin_constant>;
-        <type>integer</type> gCounter = 0;
+        <preprocessor>#include "header.lslm"</preprocessor>
 
-        <keyword>default</keyword> {
-            <event>state_entry</event>() {
-                <builtin_function>llOwnerSay</builtin_function>("Script initialized: " + (<type>string</type>)gCounter);
-            }
+        <preprocessor>#ifdef DEBUG</preprocessor>
+        <disabled_code>    // This block is disabled</disabled_code>
+        <disabled_code>    <builtin_function>llOwnerSay</builtin_function>("Debug active"<punctuation>);</disabled_code>
+        <preprocessor>#endif</preprocessor>
 
-            <event>touch_start</event>(<type>integer</type> total_number) {
-                gPosition = <builtin_function>llGetPos</builtin_function>();
-                <builtin_function>llSay</builtin_function>(0, "Touched at position: " + (<type>string</type>)gPosition);
-                <keyword>if</keyword> (total_number > 1) {
-                    <keyword>jump</keyword> finish;
-                }
-        @finish;
-            }
-        }
+        <type>vector</type> <identifier>gPosition</identifier> <operation_sign>=</operation_sign> <builtin_constant>ZERO_VECTOR</builtin_constant><punctuation>;</punctuation>
+        <type>integer</type> <identifier>gCounter</identifier> <operation_sign>=</operation_sign> <number>10</number><punctuation>;</punctuation>
+        <type>string</type> <identifier>gText</identifier> <operation_sign>=</operation_sign> "hello"<punctuation>;</punctuation>
+
+        <keyword>default</keyword> <braces>{</braces>
+            <event>state_entry</event><braces>()</braces> <braces>{</braces>
+                <builtin_function>llOwnerSay</builtin_function><braces>("Script initialized: " + (<type>string</type>)<identifier>gCounter</identifier>)</braces><punctuation>;</punctuation>
+            <braces>}</braces>
+
+            <event>touch_start</event><braces>(<type>integer</type> <identifier>total_number</identifier>)</braces> <braces>{</braces>
+                <identifier>gPosition</identifier> <operation_sign>=</operation_sign> <builtin_function>llGetPos</builtin_function><braces>()</braces><punctuation>;</punctuation>
+                <builtin_function>llSay</builtin_function><braces><number>0</number><punctuation>,</punctuation> "Touched"</braces><punctuation>;</punctuation>
+                <keyword>if</keyword> <braces><identifier>total_number</identifier> <operation_sign>></operation_sign> <number>1</number></braces> <braces>{</braces>
+                    <keyword>jump</keyword> finish<punctuation>;</punctuation>
+                <braces>}</braces>
+        @finish<punctuation>;</punctuation>
+            <braces>}</braces>
+        <braces>}</braces>
         """.trimIndent()
 
     override fun getAdditionalHighlightingTagToDescriptorMap(): Map<String, TextAttributesKey> = mapOf(
@@ -45,7 +52,6 @@ class LslColorSettingsPage : ColorSettingsPage {
         "builtin_function" to LslColorKeys.BUILTIN_FUNCTION,
         "builtin_constant" to LslColorKeys.BUILTIN_CONSTANT,
         "event" to LslColorKeys.EVENT,
-        "constant" to LslColorKeys.CONSTANT,
         "identifier" to LslColorKeys.IDENTIFIER,
         "number" to LslColorKeys.NUMBER,
         "string" to LslColorKeys.STRING,
@@ -53,12 +59,10 @@ class LslColorSettingsPage : ColorSettingsPage {
         "block_comment" to LslColorKeys.BLOCK_COMMENT,
         "operation_sign" to LslColorKeys.OPERATION_SIGN,
         "braces" to LslColorKeys.BRACES,
-        "dot" to LslColorKeys.DOT,
-        "semicolon" to LslColorKeys.SEMICOLON,
-        "comma" to LslColorKeys.COMMA,
-        "parentheses" to LslColorKeys.PARENTHESES,
-        "brackets" to LslColorKeys.BRACKETS,
+        "punctuation" to LslColorKeys.PUNCTUATION,
         "label" to LslColorKeys.LABEL,
+        "preprocessor" to LslColorKeys.PREPROCESSOR,
+        "disabled_code" to LslColorKeys.DISABLED_CODE,
     )
 
     override fun getAttributeDescriptors(): Array<AttributesDescriptor> = DESCRIPTORS
@@ -69,25 +73,22 @@ class LslColorSettingsPage : ColorSettingsPage {
 
     companion object {
         private val DESCRIPTORS = arrayOf(
-            AttributesDescriptor("Keywords//Keyword", LslColorKeys.KEYWORD),
-            AttributesDescriptor("Keywords//Type", LslColorKeys.TYPE),
-            AttributesDescriptor("Functions//Built-in function", LslColorKeys.BUILTIN_FUNCTION),
-            AttributesDescriptor("Constants//Built-in constant", LslColorKeys.BUILTIN_CONSTANT),
-            AttributesDescriptor("Constants//Constant", LslColorKeys.CONSTANT),
-            AttributesDescriptor("Events//Event handler", LslColorKeys.EVENT),
-            AttributesDescriptor("Identifiers//Identifier", LslColorKeys.IDENTIFIER),
-            AttributesDescriptor("Comments//Line comment", LslColorKeys.LINE_COMMENT),
-            AttributesDescriptor("Comments//Block comment", LslColorKeys.BLOCK_COMMENT),
-            AttributesDescriptor("Literals//Number", LslColorKeys.NUMBER),
-            AttributesDescriptor("Literals//String", LslColorKeys.STRING),
-            AttributesDescriptor("Braces and Operators//Braces", LslColorKeys.BRACES),
-            AttributesDescriptor("Braces and Operators//Brackets", LslColorKeys.BRACKETS),
-            AttributesDescriptor("Braces and Operators//Parentheses", LslColorKeys.PARENTHESES),
-            AttributesDescriptor("Braces and Operators//Comma", LslColorKeys.COMMA),
-            AttributesDescriptor("Braces and Operators//Semicolon", LslColorKeys.SEMICOLON),
-            AttributesDescriptor("Braces and Operators//Dot", LslColorKeys.DOT),
-            AttributesDescriptor("Braces and Operators//Operator sign", LslColorKeys.OPERATION_SIGN),
-            AttributesDescriptor("Labels//Label", LslColorKeys.LABEL),
+            AttributesDescriptor("Keyword", LslColorKeys.KEYWORD),
+            AttributesDescriptor("Type", LslColorKeys.TYPE),
+            AttributesDescriptor("Built-in function", LslColorKeys.BUILTIN_FUNCTION),
+            AttributesDescriptor("Built-in constant", LslColorKeys.BUILTIN_CONSTANT),
+            AttributesDescriptor("Event handler", LslColorKeys.EVENT),
+            AttributesDescriptor("Identifier", LslColorKeys.IDENTIFIER),
+            AttributesDescriptor("Line comment", LslColorKeys.LINE_COMMENT),
+            AttributesDescriptor("Block comment", LslColorKeys.BLOCK_COMMENT),
+            AttributesDescriptor("Preprocessor directive", LslColorKeys.PREPROCESSOR),
+            AttributesDescriptor("Disabled code", LslColorKeys.DISABLED_CODE),
+            AttributesDescriptor("Label", LslColorKeys.LABEL),
+            AttributesDescriptor("Number", LslColorKeys.NUMBER),
+            AttributesDescriptor("String", LslColorKeys.STRING),
+            AttributesDescriptor("Braces, brackets and parentheses", LslColorKeys.BRACES),
+            AttributesDescriptor("Operator sign", LslColorKeys.OPERATION_SIGN),
+            AttributesDescriptor("Punctuation", LslColorKeys.PUNCTUATION),
         )
     }
 }

@@ -1,6 +1,9 @@
 package io.github.koollsl.lsl.inspections
 
-import com.intellij.codeInspection.*
+import com.intellij.codeInspection.LocalInspectionTool
+import com.intellij.codeInspection.LocalQuickFixOnPsiElement
+import com.intellij.codeInspection.ProblemHighlightType
+import com.intellij.codeInspection.ProblemsHolder
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.TextRange
@@ -20,15 +23,17 @@ class LslRedundantTypeCastInspection : LocalInspectionTool() {
     override fun getStaticDescription(): String = getDisplayName()
 
     override fun buildVisitor(holder: ProblemsHolder, isOnTheFly: Boolean): PsiElementVisitor {
+        // 1. Fetch file and preprocessor service ONCE per inspection pass
         val file = holder.file
-        val engine = file.project.service<LslPreprocessorEngine>()
+        val preprocessorEngine = holder.project.service<LslPreprocessorEngine>()
 
         return object : LslElementVisitor() {
-
-            override fun visitElement(element: PsiElement) {
+            override fun visitPsiElement(element: PsiElement) {
                 if (element !is LslExpressionTypeCast) return
                 if (element.textRange.isEmpty) return
-                if (engine.isElementDisabled(element)) return
+
+                // 2. Preprocessor check FIRST before evaluating type casts
+                if (preprocessorEngine.isDisabledText(file, element.textRange)) return
 
                 val targetType = element.lslType
                 if (targetType == LslPrimitiveType.INVALID) return
@@ -36,12 +41,14 @@ class LslRedundantTypeCastInspection : LocalInspectionTool() {
                 val innerExpression = element.expression ?: return
                 val expressionType = innerExpression.lslType ?: LslPrimitiveType.INVALID
 
+                // 3. Check if casting to the same type is redundant
                 if (targetType == expressionType) {
                     val endOffset = element.parenthesesRightEl?.textRangeInParent?.endOffset
                         ?: innerExpression.textRangeInParent.startOffset
 
                     val highlightRange = TextRange(0, endOffset)
 
+                    // 4. Register problem and attach quick fix for redundant type casts
                     holder.registerProblem(
                         element,
                         "Redundant type cast",

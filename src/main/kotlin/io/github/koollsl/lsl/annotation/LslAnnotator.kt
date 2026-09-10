@@ -7,22 +7,26 @@ import com.intellij.openapi.components.serviceOrNull
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
 import io.github.koollsl.lsl.KwdbData
+import io.github.koollsl.lsl.preprocessor.LslIncludesCollector
 import io.github.koollsl.lsl.preprocessor.LslPreprocessorEngine
 import io.github.koollsl.lsl.psi.LslEvent
 import io.github.koollsl.lsl.psi.LslExpressionFunctionCall
-import io.github.koollsl.lsl.psi.LslFunction
 import io.github.koollsl.lsl.psi.LslLValue
-import io.github.koollsl.lsl.psi.LslStatement
 import io.github.koollsl.lsl.syntax.LslColorKeys
 
 class LslAnnotator : Annotator {
     override fun annotate(element: PsiElement, holder: AnnotationHolder) {
         // FAST EXIT 1: Only check file-level includes on PsiFile
         if (element is PsiFile) {
-            val engine = element.project.serviceOrNull<LslPreprocessorEngine>() ?: return
-            engine.annotateIncludes(element, holder)
+            val includesCollector = element.project.serviceOrNull<LslIncludesCollector>() ?: return
+            includesCollector.annotateIncludes(element, holder)
             return
         }
+//        if (element is PsiFile) {
+//            val engine = element.project.serviceOrNull<LslPreprocessorEngine>() ?: return
+//            engine.annotateIncludes(element, holder)
+//            return
+//        }
 
         // FAST EXIT 2: Filter elements BEFORE checking the preprocessor
         if (element !is LslExpressionFunctionCall &&

@@ -1,14 +1,19 @@
 package io.github.koollsl.lsl.inspections
 
-import com.intellij.codeInspection.*
+import com.intellij.codeInsight.intention.FileModifier
+import com.intellij.codeInspection.LocalInspectionTool
+import com.intellij.codeInspection.LocalQuickFixOnPsiElement
+import com.intellij.codeInspection.ProblemHighlightType
+import com.intellij.codeInspection.ProblemsHolder
+import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.TextRange
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiElementVisitor
 import com.intellij.psi.PsiFile
 import com.intellij.psi.util.PsiTreeUtil
-import com.intellij.refactoring.suggested.endOffset
-import com.intellij.refactoring.suggested.startOffset
+import com.intellij.psi.util.endOffset
+import com.intellij.psi.util.startOffset
 import io.github.koollsl.lsl.KwdbData
 import io.github.koollsl.lsl.LslLanguage
 import io.github.koollsl.lsl.LslPrimitiveType
@@ -27,28 +32,29 @@ class LslInvalidEventDeclarationInspection : LocalInspectionTool() {
     override fun getStaticDescription(): String = "Invalid event declaration"
 
     override fun buildVisitor(holder: ProblemsHolder, isOnTheFly: Boolean): PsiElementVisitor {
+        // 1. Fetch file and services ONCE per inspection pass
         val file = holder.file
-        val kwdbData = KwdbData.getInstance(file.project)
-        val preprocessorEngine = file.project.getService(LslPreprocessorEngine::class.java)
+        val preprocessorEngine = holder.project.service<LslPreprocessorEngine>()
+        val kwdbData = KwdbData.getInstance(holder.project)
 
         return object : LslElementVisitor() {
-            override fun visitElement(element: PsiElement) {
-                if (element !is LslEvent) return
-                if (preprocessorEngine.isDisabledText(file, element.textRange)) return
+            override fun visitEvent(event: LslEvent) {
+                // 2. Preprocessor check FIRST before validating event declarations
+                if (preprocessorEngine.isDisabledText(file, event.textRange)) return
 
-                val definition = kwdbData.events[element.name]
+                val definition = kwdbData.events[event.name]
                 if (definition == null) {
                     holder.registerProblem(
-                        element,
+                        event,
                         "Unknown event",
                         ProblemHighlightType.ERROR,
-                        TextRange(0, element.textLength),
-                        RemoveEventFix(element)
+                        TextRange(0, event.textLength),
+                        RemoveEventFix(event)
                     )
                     return
                 }
 
-                val arguments = element.arguments
+                val arguments = event.arguments
 
                 if (arguments.isNotEmpty()) {
                     (0 until min(arguments.size, definition.arguments.size)).forEach { i ->
@@ -57,7 +63,7 @@ class LslInvalidEventDeclarationInspection : LocalInspectionTool() {
 
                         if (definitionType.operationTo(argumentType, LslTypes.ASSIGN) == LslPrimitiveType.INVALID) {
                             holder.registerProblem(
-                                element,
+                                event,
                                 "Type mismatch (expected %s, got %s)".format(definitionType, argumentType),
                                 ProblemHighlightType.GENERIC_ERROR,
                                 arguments[i].textRangeInParent,
@@ -69,16 +75,16 @@ class LslInvalidEventDeclarationInspection : LocalInspectionTool() {
 
                 if (arguments.size < definition.arguments.size) {
                     val missingDefs = definition.arguments.subList(arguments.size, definition.arguments.size)
-                    val targetRange = element.parenthesesRightEl?.textRangeInParent
-                        ?: TextRange(element.textLength - 1, element.textLength)
+                    val targetRange = event.parenthesesRightEl?.textRangeInParent
+                        ?: TextRange(event.textLength - 1, event.textLength)
 
                     holder.registerProblem(
-                        element,
+                        event,
                         "Wrong arguments count (expected ${definition.arguments.size}, got ${arguments.size})",
                         ProblemHighlightType.GENERIC_ERROR,
                         targetRange,
                         AddMissingArgumentsFix(
-                            element,
+                            event,
                             missingDefs.map { "${it.lslType.name.lowercase()} ${it.name}" }
                         )
                     )
@@ -88,21 +94,22 @@ class LslInvalidEventDeclarationInspection : LocalInspectionTool() {
                     else
                         arguments.first()
 
-                    val firstExtraArgumentComma = element.argumentsEl?.node?.getChildren(null)
+                    val firstExtraArgumentComma = event.argumentsEl?.node?.getChildren(null)
                         ?.filter { it.elementType == LslTypes.COMMA }
                         ?.lastOrNull { it.psi.endOffset < firstExtraArgument.startOffset }
                         ?.psi
 
                     val lastExtraArgument = arguments.last()
 
-                    val startOffset = (firstExtraArgumentComma?.startOffset ?: firstExtraArgument.startOffset) - element.startOffset
-                    val endOffset = lastExtraArgument.endOffset - element.startOffset
+                    val startOffset =
+                        (firstExtraArgumentComma?.startOffset ?: firstExtraArgument.startOffset) - event.startOffset
+                    val endOffset = lastExtraArgument.endOffset - event.startOffset
 
                     holder.registerProblem(
-                        element,
+                        event,
                         "Wrong arguments count (expected ${definition.arguments.size}, got ${arguments.size})",
                         ProblemHighlightType.GENERIC_ERROR,
-                        TextRange(startOffset.coerceAtLeast(0), endOffset.coerceAtMost(element.textLength)),
+                        TextRange(startOffset.coerceAtLeast(0), endOffset.coerceAtMost(event.textLength)),
                         RemoveExtraArgumentsFix(
                             firstExtraArgumentComma ?: firstExtraArgument,
                             lastExtraArgument
@@ -142,12 +149,20 @@ class LslInvalidEventDeclarationInspection : LocalInspectionTool() {
         }
     }
 
-    class AddMissingArgumentsFix(event: LslEvent, private val missingArgStrings: List<String>) :
-        LocalQuickFixOnPsiElement(event) {
+    class AddMissingArgumentsFix(
+        event: LslEvent,
+        @FileModifier.SafeFieldForPreview private val missingArgStrings: List<String>
+    ) : LocalQuickFixOnPsiElement(event) {
+
         override fun getFamilyName(): String = "Add missing arguments"
         override fun getText(): String = familyName
 
-        override fun invoke(project: Project, file: PsiFile, startElement: PsiElement, endElement: PsiElement) {
+        override fun invoke(
+            project: Project,
+            file: PsiFile,
+            startElement: PsiElement,
+            endElement: PsiElement
+        ) {
             val event = startElement as? LslEvent ?: return
             val argumentsEl = event.argumentsEl ?: return
 
@@ -165,4 +180,6 @@ class LslInvalidEventDeclarationInspection : LocalInspectionTool() {
             }
         }
     }
+
+
 }

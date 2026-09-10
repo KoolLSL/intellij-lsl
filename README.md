@@ -24,12 +24,25 @@ Write LSL (Linden Script Language) directly inside IntelliJ IDEA, PyCharm, Andro
 
 1. **Create a Project:** Open your IDE, go to **File → New → Project...**, select **Linden Script (LSL)**, and click **Create**.
 2. **Add Your Source Files:**
-    * **`.lslp` (Preprocessed File):** Create your main script here (e.g. `MyScript.lslp`). It can use `#include`, `#inline`, or `#ifdef` directives.
+    * **`.lslp` (Preprocessed File):** Create your main script here (e.g. `MyScript.lslp`). It can use directives.
     * **`.lslm` (Module File):** Optional. Shared library files containing functions or constants to reuse across scripts (e.g. via `#include "MyLib.lslm"` inside `MyScript.lslp`).
 3. **Build:** Save your `.lslp` file (`Ctrl+S`). The plugin automatically generates an optimized, read-only **`.lsl`** script in the `/build` folder (e.g. `/build/MyScript.lsl`).
 
 4. **Import into Second Life:** If you have the **Firestorm Viewer**, enable its LSL preprocessor to automatically get the generated `.lsl` from your local disk when you recompile in-world (e.g. in your in-world script, write only `#include "MyProject/build/MyScript.lsl"`). Alternatively, you can copy and paste the generated `.lsl` text into your viewer script editor.
 
+### Directives
+
+* **`#define`** — Defines a constant or macro (e.g., `#define VERSION 3`).
+* **`#undef`** — Removes an existing definition (e.g., `#undef DEBUG`).
+* **`#if`** — Evaluates a custom boolean expression (e.g., `#if VERSION >= 2`).
+* **`#ifdef`** — Includes code if an identifier is defined (e.g., `#ifdef DEBUG`).
+* **`#ifndef`** — Includes code if an identifier is *not* defined (e.g., `#ifndef PROD`).
+* **`#elif`** — Alternative conditional branch (`else if`) within a block.
+* **`#else`** — Fallback branch when prior conditions fail.
+* **`#endif`** — Closes an active conditional block.
+* **`#include`** — Merges an external `.lslm` module (e.g., `#include "Vectors.lslm"`). The file must be in the same
+  folder or in a folder of the Project properties / Content roots.
+* **`#inline`** — Inlines the function written below directly in the code instead of calling it.
 ---
 
 ### Issues & Feedback

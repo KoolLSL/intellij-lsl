@@ -1,8 +1,9 @@
 package io.github.koollsl.lsl.inspections
 
-import com.intellij.codeInspection.*
+import com.intellij.codeInspection.LocalInspectionTool
+import com.intellij.codeInspection.ProblemHighlightType
+import com.intellij.codeInspection.ProblemsHolder
 import com.intellij.openapi.components.service
-import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiElementVisitor
 import io.github.koollsl.lsl.LslLanguage
 import io.github.koollsl.lsl.preprocessor.LslPreprocessorEngine
@@ -16,27 +17,28 @@ class LslUndeclaredFunctionInspection : LocalInspectionTool() {
     override fun getStaticDescription(): String = getDisplayName()
 
     override fun buildVisitor(holder: ProblemsHolder, isOnTheFly: Boolean): PsiElementVisitor {
+        // 1. Fetch file and preprocessor service ONCE per inspection pass
         val file = holder.file
-        val preprocessorEngine = file.project.service<LslPreprocessorEngine>()
+        val preprocessorEngine = holder.project.service<LslPreprocessorEngine>()
 
         return object : LslElementVisitor() {
+            override fun visitExpressionFunctionCall(expressionFunctionCall: LslExpressionFunctionCall) {
+                // 2. Preprocessor check FIRST before evaluating function calls
+                if (preprocessorEngine.isDisabledText(file, expressionFunctionCall.textRange)) return
 
-            override fun visitElement(element: PsiElement) {
-                // 1. Guard check: only process function calls
-                if (element !is LslExpressionFunctionCall) return
-                if (element.textRange.isEmpty) return
-                if (preprocessorEngine.isDisabledText(file, element.textRange)) return
+                // 3. Guard check: process non-empty function calls
+                if (expressionFunctionCall.textRange.isEmpty) return
 
-                // 2. Locate function identifier
-                val identifier = element.functionNameIdentifier ?: return
+                // 4. Locate function identifier
+                val identifier = expressionFunctionCall.functionNameIdentifier ?: return
 
-                // 3. Resolve reference from identifier OR call expression
-                val reference = identifier.reference ?: element.reference
+                // 5. Resolve reference from identifier OR call expression
+                val reference = identifier.reference ?: expressionFunctionCall.reference
 
-                // 4. Flag if no reference exists or resolution yields null
+                // 6. Flag if no reference exists or resolution yields null
                 if (reference == null || reference.resolve() == null) {
                     holder.registerProblem(
-                        element,
+                        expressionFunctionCall,
                         "Undeclared function '${identifier.text}'",
                         ProblemHighlightType.ERROR,
                         identifier.textRangeInParent

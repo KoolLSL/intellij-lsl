@@ -20,9 +20,19 @@
 
     <depends>com.intellij.modules.platform</depends>
 
+    <!-- Register resource bundle for UI localizations -->
+    <resource-bundle>messages.LslBundle</resource-bundle>
+
     <extensions defaultExtensionNs="com.intellij">
         <!-- Project Services -->
         <projectService serviceImplementation="io.github.koollsl.lsl.preprocessor.LslPreprocessorEngine"/>
+        <!-- Provider for calculating the hints in editor -->
+        <codeInsight.daemonBoundCodeVisionProvider
+                implementation="io.github.koollsl.lsl.references.LslFunctionUsageCodeVisionProvider"/>
+
+        <!-- Provider for the Settings UI label (CRITICAL: extension point name must match EP.EXTENSION_POINT_NAME) -->
+        <config.codeVisionGroupSettingProvider
+                implementation="io.github.koollsl.lsl.references.LslCodeVisionGroupSettingProvider"/>
 
         <!-- Language Definitions & Syntax -->
         <fileType
@@ -105,6 +115,9 @@
                 implementation="io.github.koollsl.lsl.psi.LslProjectViewNodeDecorator"/>
 
         <postStartupActivity implementation="io.github.koollsl.lsl.psi.LslStartupActivity"/>
+
+        <codeInsight.daemonBoundCodeVisionProvider
+                implementation="io.github.koollsl.lsl.references.LslFunctionUsageCodeVisionProvider"/>
 
         <applicationConfigurable
                 parentId="language"
@@ -274,5 +287,27 @@
                     anchor="before"
                     relative-to-action="NewFile"/>
         </action>
+
+        <!-- Action 1: Open in new/focused Tab -->
+        <action id="Lsl.OpenProcessedFile"
+                class="io.github.koollsl.lsl.actions.OpenProcessedLslAction"
+                text="Open Processed File (.lsl)"
+                description="Opens the corresponding .lsl file"
+                icon="AllIcons.Actions.Preview">
+        </action>
+
+        <!-- Add both to the top of the Tab Right-Click Menu -->
+        <group id="Lsl.ProcessedFileGroup"
+                text="LSL Preprocessor"
+                popup="false">
+            <!-- Changed anchor to "first" to place at the top -->
+            <add-to-group group-id="EditorTabPopupMenu"
+                    anchor="first"/>
+            <add-to-group group-id="ProjectViewPopupMenu"
+                    anchor="first"/>
+
+            <reference ref="Lsl.OpenProcessedFile"/>
+            <separator/> <!-- Separator keeps your items visually distinct from standard IDE options -->
+        </group>
     </actions>
 </idea-plugin>

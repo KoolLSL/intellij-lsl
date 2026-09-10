@@ -1,6 +1,10 @@
 package io.github.koollsl.lsl.inspections
 
-import com.intellij.codeInspection.*
+import com.intellij.codeInspection.LocalInspectionTool
+import com.intellij.codeInspection.LocalQuickFixOnPsiElement
+import com.intellij.codeInspection.ProblemHighlightType
+import com.intellij.codeInspection.ProblemsHolder
+import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.TextRange
 import com.intellij.psi.PsiElement
@@ -9,7 +13,6 @@ import com.intellij.psi.PsiFile
 import com.intellij.psi.util.PsiTreeUtil
 import io.github.koollsl.lsl.LslLanguage
 import io.github.koollsl.lsl.LslPrimitiveType
-import io.github.koollsl.lsl.formatting.LslBlock
 import io.github.koollsl.lsl.parser.LslTypes
 import io.github.koollsl.lsl.preprocessor.LslPreprocessorEngine
 import io.github.koollsl.lsl.psi.*
@@ -22,17 +25,17 @@ class LslInvalidReturnTypeInspection : LocalInspectionTool() {
 
     override fun buildVisitor(holder: ProblemsHolder, isOnTheFly: Boolean): PsiElementVisitor {
         val file = holder.file
-        val preprocessorEngine = file.project.getService(LslPreprocessorEngine::class.java)
+        val preprocessorEngine = holder.project.service<LslPreprocessorEngine>()
 
         return object : LslElementVisitor() {
-            override fun visitElement(element: PsiElement) {
-                super.visitElement(element)
+            override fun visitStatementReturn(element: LslStatementReturn) {
                 if (preprocessorEngine.isDisabledText(file, element.textRange)) return
+                checkReturnStatement(element)
+            }
 
-                when (element) {
-                    is LslStatementReturn -> checkReturnStatement(element)
-                    is LslFunction -> checkMissingReturnPath(element)
-                }
+            override fun visitFunction(element: LslFunction) {
+                if (preprocessorEngine.isDisabledText(file, element.textRange)) return
+                checkMissingReturnPath(element)
             }
 
             private fun checkReturnStatement(element: LslStatementReturn) {
@@ -108,8 +111,20 @@ class LslInvalidReturnTypeInspection : LocalInspectionTool() {
                     }
 
                     is LslStatementIf -> {
-                        val thenBranch = element.statement
-                        val elseBranch = element.statementElse
+                        val statements = mutableListOf<PsiElement>()
+                        for (child in element.children) {
+                            if (child is LslStatement || child is LslStatementBlock) {
+                                statements.add(child)
+                            } else {
+                                for (subChild in child.children) {
+                                    if (subChild is LslStatement || subChild is LslStatementBlock) {
+                                        statements.add(subChild)
+                                    }
+                                }
+                            }
+                        }
+                        val thenBranch = statements.getOrNull(0)
+                        val elseBranch = statements.getOrNull(1)
 
                         // An IF statement guarantees a return only if BOTH branches explicitly return
                         if (thenBranch != null && elseBranch != null) {
@@ -128,7 +143,8 @@ class LslInvalidReturnTypeInspection : LocalInspectionTool() {
                         hasReturn
                     }
                 }
-            }        }
+            }
+        }
     }
 
     private fun findEnclosingFunction(element: PsiElement): LslFunction? {

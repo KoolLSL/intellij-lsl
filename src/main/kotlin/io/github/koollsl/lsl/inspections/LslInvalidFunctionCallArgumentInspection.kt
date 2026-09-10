@@ -1,20 +1,24 @@
 package io.github.koollsl.lsl.inspections
 
-import com.intellij.codeInspection.*
+import com.intellij.codeInspection.LocalInspectionTool
+import com.intellij.codeInspection.LocalQuickFixOnPsiElement
+import com.intellij.codeInspection.ProblemHighlightType
+import com.intellij.codeInspection.ProblemsHolder
+import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.TextRange
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiElementVisitor
 import com.intellij.psi.PsiFile
-import com.intellij.psi.util.PsiTreeUtil
-import com.intellij.refactoring.suggested.endOffset
-import com.intellij.refactoring.suggested.startOffset
+import com.intellij.psi.util.endOffset
+import com.intellij.psi.util.startOffset
 import io.github.koollsl.lsl.LslLanguage
 import io.github.koollsl.lsl.LslPrimitiveType
 import io.github.koollsl.lsl.parser.LslTypes
 import io.github.koollsl.lsl.preprocessor.LslPreprocessorEngine
-import io.github.koollsl.lsl.psi.*
-import kotlin.math.min
+import io.github.koollsl.lsl.psi.LslElementVisitor
+import io.github.koollsl.lsl.psi.LslExpressionFunctionCall
+import io.github.koollsl.lsl.psi.LslFunction
 
 class LslInvalidFunctionCallArgumentInspection : LocalInspectionTool() {
 
@@ -23,44 +27,46 @@ class LslInvalidFunctionCallArgumentInspection : LocalInspectionTool() {
     override fun isEnabledByDefault(): Boolean = true
     override fun getStaticDescription(): String = "Invalid function call argument"
 
-    override fun checkFile(file: PsiFile, manager: InspectionManager, isOnTheFly: Boolean): Array<ProblemDescriptor> {
-        val holder = ProblemsHolder(manager, file, isOnTheFly)
-        val preprocessorEngine = file.project.getService(LslPreprocessorEngine::class.java)
+    override fun buildVisitor(holder: ProblemsHolder, isOnTheFly: Boolean): PsiElementVisitor {
+        // 1. Fetch file and preprocessor service ONCE per inspection pass
+        val file = holder.file
+        val preprocessorEngine = holder.project.service<LslPreprocessorEngine>()
 
-        PsiTreeUtil.collectElementsOfType(file, LslExpressionFunctionCall::class.java)
-            .asSequence()
-            .filter { !preprocessorEngine.isDisabledText(file, it.textRange) }
-            .forEach { call ->
-                // Resolve function target (works for user and built-in LSL functions)
-                val targetFunction = call.reference?.resolve() as? LslFunction ?: return@forEach
+        return object : LslElementVisitor() {
+
+            override fun visitExpressionFunctionCall(expressionFunctionCall: LslExpressionFunctionCall) {
+                // 2. Preprocessor check FIRST before resolving reference or evaluating arguments
+                if (preprocessorEngine.isDisabledText(file, expressionFunctionCall.textRange)) return
+
+                val targetFunction = expressionFunctionCall.reference?.resolve() as? LslFunction ?: return
                 val arguments = targetFunction.arguments
-                val expressions = call.expressions
+                val expressions = expressionFunctionCall.expressions
 
                 // 1. Check for argument type mismatches
                 if (expressions.isNotEmpty()) {
-                    (0 until min(expressions.size, arguments.size)).forEach { i ->
+                    (0 until minOf(expressions.size, arguments.size)).forEach { i ->
                         val argumentType = arguments[i].lslType
-                        val expression = expressions[i]
-                        val expressionType = expression.lslType
+                        val expr = expressions[i]
+                        val expressionType = expr.lslType
 
                         if (argumentType.operationTo(expressionType, LslTypes.ASSIGN) == LslPrimitiveType.INVALID) {
                             holder.registerProblem(
-                                expression,
+                                expr,
                                 "Type mismatch (expected %s, got %s)".format(argumentType, expressionType),
                                 ProblemHighlightType.GENERIC_ERROR,
-                                LslInvalidExpressionTypeInspection.TypeCastFix(expression, argumentType)
+                                LslInvalidExpressionTypeInspection.TypeCastFix(expr, argumentType)
                             )
                         }
                     }
                 }
 
-                // 2. Check for parameter count mismatches
+                // 2. Check for parameter count mismatches (too few)
                 if (expressions.size < arguments.size) {
-                    val targetRange = call.parenthesesRightEl?.textRangeInParent
-                        ?: call.lastChild.textRangeInParent
+                    val targetRange = expressionFunctionCall.parenthesesRightEl?.textRangeInParent
+                        ?: expressionFunctionCall.lastChild.textRangeInParent
 
                     holder.registerProblem(
-                        call,
+                        expressionFunctionCall,
                         "Wrong arguments count (expected ${arguments.size}, got ${expressions.size})",
                         ProblemHighlightType.GENERIC_ERROR,
                         targetRange
@@ -74,7 +80,7 @@ class LslInvalidFunctionCallArgumentInspection : LocalInspectionTool() {
                         expressions.first()
                     }
 
-                    val firstExtraExpressionComma = call.node.getChildren(null)
+                    val firstExtraExpressionComma = expressionFunctionCall.node.getChildren(null)
                         .filter { it.elementType == LslTypes.COMMA }
                         .lastOrNull { it.psi.endOffset < firstExtraExpression.startOffset }
                         ?.psi
@@ -88,7 +94,7 @@ class LslInvalidFunctionCallArgumentInspection : LocalInspectionTool() {
                     )
 
                     holder.registerProblem(
-                        call,
+                        expressionFunctionCall,
                         "Wrong arguments count (expected ${arguments.size}, got ${expressions.size})",
                         ProblemHighlightType.GENERIC_ERROR,
                         targetRange,
@@ -99,15 +105,13 @@ class LslInvalidFunctionCallArgumentInspection : LocalInspectionTool() {
                     )
                 }
             }
-
-        return holder.resultsArray
+        }
     }
 
     class RemoveExtraArgumentsFix(startElement: PsiElement, endElement: PsiElement) :
         LocalQuickFixOnPsiElement(startElement, endElement) {
 
         override fun getFamilyName(): String = "Remove extra arguments"
-
         override fun getText(): String = familyName
 
         override fun invoke(
@@ -116,7 +120,7 @@ class LslInvalidFunctionCallArgumentInspection : LocalInspectionTool() {
             startElement: PsiElement,
             endElement: PsiElement
         ) {
-            startElement.parent.deleteChildRange(startElement, endElement)
+            startElement.parent?.deleteChildRange(startElement, endElement)
         }
     }
 }

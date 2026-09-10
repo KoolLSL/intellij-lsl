@@ -1,6 +1,8 @@
 package io.github.koollsl.lsl.inspections
 
-import com.intellij.codeInspection.*
+import com.intellij.codeInspection.LocalInspectionTool
+import com.intellij.codeInspection.ProblemHighlightType
+import com.intellij.codeInspection.ProblemsHolder
 import com.intellij.openapi.components.service
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiElementVisitor
@@ -18,22 +20,23 @@ class LslReservedIdentifierInspection : LocalInspectionTool() {
     override fun getStaticDescription(): String = getDisplayName()
 
     override fun buildVisitor(holder: ProblemsHolder, isOnTheFly: Boolean): PsiElementVisitor {
+        // 1. Fetch file, preprocessor service, and keyword database ONCE per inspection pass
         val file = holder.file
-        val engine = file.project.service<LslPreprocessorEngine>()
-
-        val kwdbData = KwdbData.getInstance(file.project)
+        val preprocessorEngine = holder.project.service<LslPreprocessorEngine>()
+        val kwdbData = KwdbData.getInstance(holder.project)
         val kwdbNames = kwdbData.constants.keys + kwdbData.functions.keys + kwdbData.events.keys
 
         return object : LslElementVisitor() {
-
-            override fun visitElement(element: PsiElement) {
-                if (element !is LslNamedElement) return
-                if (element is LslEvent) return
+            override fun visitPsiElement(element: PsiElement) {
+                if (element !is LslNamedElement || element is LslEvent) return
                 if (element.textRange.isEmpty) return
-                if (engine.isElementDisabled(element)) return
+
+                // 2. Preprocessor check FIRST before evaluating reserved identifiers
+                if (preprocessorEngine.isDisabledText(file, element.textRange)) return
 
                 val name = element.name ?: return
 
+                // 3. Check if the identifier matches a reserved keyword, constant, function, or event name
                 if (kwdbNames.contains(name)) {
                     holder.registerProblem(
                         element,

@@ -19,8 +19,9 @@ class LslSyntaxHighlighter : SyntaxHighlighterBase() {
             )
 
             LslTypes.STRING_CONSTANT, LslTypes.UNCLOSED_STRING_CONSTANT -> arrayOf(STRING)
+            LslTypes.LINE_COMMENT -> arrayOf(LINE_COMMENT)
             LslTypes.BLOCK_COMMENT -> arrayOf(BLOCK_COMMENT)
-            LslTypes.LINE_COMMENT, LslTypes.PREPROCESSOR_DIRECTIVE -> arrayOf(LINE_COMMENT)
+            LslTypes.PREPROCESSOR_DIRECTIVE -> arrayOf(PREPROCESSOR)
 
             LslTypes.ASSIGN, LslTypes.PLUS_ASSIGN, LslTypes.MINUS_ASSIGN, LslTypes.MULTIPLE_ASSIGN, LslTypes.DIVIDE_ASSIGN, LslTypes.MODULUS_ASSIGN, LslTypes.PLUS, LslTypes.MINUS, LslTypes.MULTIPLE, LslTypes.DIVIDE, LslTypes.MODULUS, LslTypes.PLUS_PLUS, LslTypes.MINUS_MINUS, LslTypes.EQUAL, LslTypes.NOT_EQUAL, LslTypes.LESS, LslTypes.LESS_EQUAL, LslTypes.GREATER, LslTypes.GREATER_EQUAL, LslTypes.BITWISE_OR, LslTypes.BITWISE_XOR, LslTypes.BITWISE_AND, LslTypes.BITWISE_NOT, LslTypes.BOOLEAN_NOT, LslTypes.BOOLEAN_AND, LslTypes.BOOLEAN_OR, LslTypes.SHIFT_LEFT, LslTypes.SHIFT_RIGHT -> arrayOf(
                 OPERATION_SIGN
@@ -33,7 +34,7 @@ class LslSyntaxHighlighter : SyntaxHighlighterBase() {
             LslTypes.PARENTHESES_LEFT, LslTypes.PARENTHESES_RIGHT -> arrayOf(PARENTHESES)
             LslTypes.BRACKET_LEFT, LslTypes.BRACKET_RIGHT -> arrayOf(BRACKETS)
             LslTypes.LABEL -> arrayOf(LABEL)
-            //LslTypes.TRUE, LslTypes.FALSE, LslTypes.ZERO_VECTOR, LslTypes.ZERO_ROTATION, LslTypes.NULL_KEY -> arrayOf(CONSTANT)
+            //LslTypes.TRUE, LslTypes.FALSE, LslTypes.ZERO_VECTOR, LslTypes.ZERO_ROTATION, LslTypes.NULL_KEY -> arrayOf(BUILTIN_CONSTANT)
             LslTypes.TYPE_NAME -> arrayOf(
                 TYPENAME
             )
@@ -49,7 +50,7 @@ class LslSyntaxHighlighter : SyntaxHighlighterBase() {
         val STRING = LslColorKeys.STRING
         val BLOCK_COMMENT = LslColorKeys.BLOCK_COMMENT
         val LINE_COMMENT = LslColorKeys.LINE_COMMENT
-
+        val PREPROCESSOR = LslColorKeys.PREPROCESSOR
         val OPERATION_SIGN = LslColorKeys.OPERATION_SIGN
         val BRACES = LslColorKeys.BRACES
         val DOT = LslColorKeys.DOT
@@ -58,7 +59,8 @@ class LslSyntaxHighlighter : SyntaxHighlighterBase() {
         val PARENTHESES = LslColorKeys.PARENTHESES
         val BRACKETS = LslColorKeys.BRACKETS
         val LABEL = LslColorKeys.LABEL
-        val CONSTANT = LslColorKeys.CONSTANT
+        val BUILTIN_CONSTANT = LslColorKeys.BUILTIN_CONSTANT
+        val CONSTANT = LslColorKeys.BUILTIN_CONSTANT
         val TYPENAME = LslColorKeys.TYPE
 
         val EMPTY_KEYS = emptyArray<TextAttributesKey>()

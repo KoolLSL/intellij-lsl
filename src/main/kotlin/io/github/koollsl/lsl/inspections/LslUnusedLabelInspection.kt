@@ -1,6 +1,9 @@
 package io.github.koollsl.lsl.inspections
 
-import com.intellij.codeInspection.*
+import com.intellij.codeInspection.LocalInspectionTool
+import com.intellij.codeInspection.LocalQuickFixOnPsiElement
+import com.intellij.codeInspection.ProblemHighlightType
+import com.intellij.codeInspection.ProblemsHolder
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiElement
@@ -23,28 +26,32 @@ class LslUnusedLabelInspection : LocalInspectionTool() {
     override fun getStaticDescription(): String = getDisplayName()
 
     override fun buildVisitor(holder: ProblemsHolder, isOnTheFly: Boolean): PsiElementVisitor {
+        // 1. Fetch file and preprocessor service ONCE per inspection pass
         val file = holder.file
-        val preprocessorEngine = file.project.service<LslPreprocessorEngine>()
+        val preprocessorEngine = holder.project.service<LslPreprocessorEngine>()
 
         return object : LslElementVisitor() {
+            override fun visitStatementLabel(statementLabel: LslStatementLabel) {
+                // 2. Preprocessor check FIRST before evaluating labels
+                if (preprocessorEngine.isDisabledText(file, statementLabel.textRange)) return
 
-            override fun visitElement(element: PsiElement) {
-                if (element !is LslStatementLabel) return
-                if (element.textRange.isEmpty) return
-                if (preprocessorEngine.isDisabledText(file, element.textRange)) return
+                // 3. Guard check: process non-empty labels
+                if (statementLabel.textRange.isEmpty) return
 
-                // Scope label searches to the containing function or event body
-                val parentScope = element.parents(false)
+                // 4. Scope label searches to the containing function or event body
+                val parentScope = statementLabel.parents(false)
                     .firstOrNull { it is LslFunction || it is LslEvent } ?: file
                 val searchScope = LocalSearchScope(parentScope)
 
-                if (ReferencesSearch.search(element, searchScope).findFirst() == null) {
+                // 5. Flag if no references exist within the scope
+                if (ReferencesSearch.search(statementLabel, searchScope).findFirst() == null) {
+                    val labelName = statementLabel.name ?: statementLabel.identifyingElement?.text ?: "label"
                     holder.registerProblem(
-                        element,
-                        "Unused label",
+                        statementLabel,
+                        "Unused label '$labelName'",
                         ProblemHighlightType.LIKE_UNUSED_SYMBOL,
-                        element.identifyingElement?.textRangeInParent,
-                        RemoveUnusedLabelFix(element)
+                        statementLabel.identifyingElement?.textRangeInParent,
+                        RemoveUnusedLabelFix(statementLabel)
                     )
                 }
             }
