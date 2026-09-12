@@ -1,25 +1,18 @@
 package io.github.koollsl.lsl.preprocessor
 
-import com.intellij.lang.annotation.AnnotationHolder
-import com.intellij.lang.annotation.HighlightSeverity
 import com.intellij.openapi.components.Service
-import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.module.ModuleUtilCore
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.ModuleRootManager
-import com.intellij.openapi.util.TextRange
-import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.openapi.vfs.VirtualFileVisitor
-import com.intellij.psi.PsiDocumentManager
+import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.psi.PsiFile
 import com.intellij.psi.PsiManager
 import com.intellij.psi.search.FilenameIndex
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.util.CachedValueProvider
 import com.intellij.psi.util.CachedValuesManager
-import com.intellij.psi.util.PsiModificationTracker
-import io.github.koollsl.lsl.utils.LslDebug
+import io.github.koollsl.lsl.utils.getPathKey
 
 @Service(Service.Level.PROJECT)
 class LslIncludesCollector(private val project: Project) {
@@ -31,40 +24,9 @@ class LslIncludesCollector(private val project: Project) {
             project.getService(LslIncludesCollector::class.java)
     }
 
-    fun annotateIncludes(file: PsiFile?, holder: AnnotationHolder) {
-        if (file == null || !file.isValid || project.isDisposed) return
-
-        val document = PsiDocumentManager.getInstance(project).getDocument(file)
-        val includePaths = extractIncludePaths(file)
-
-        for (includedPath in includePaths) {
-            val resolvedPsi = resolveIncludeFile(includedPath, file)
-
-            if (resolvedPsi == null) {
-                // Find line range for error annotation
-                val text = file.text
-                val index = text.indexOf(includedPath)
-                val range = if (index >= 0) {
-                    TextRange(index, index + includedPath.length)
-                } else if (document != null) {
-                    val lineIndex = text.substring(0, index.coerceAtLeast(0)).count { it == '\n' }
-                    if (lineIndex in 0 until document.lineCount) {
-                        TextRange(document.getLineStartOffset(lineIndex), document.getLineEndOffset(lineIndex))
-                    } else file.textRange
-                } else {
-                    file.textRange
-                }
-
-                holder.newAnnotation(HighlightSeverity.ERROR, "Cannot resolve include file '$includedPath'")
-                    .range(range)
-                    .create()
-            }
-        }
-    }
-
     /**
      * Primary entry point for Annotator, Inspections, and Preprocessor Engine.
-     * Retains IDE caching bound to PSI modification count.
+     * Retains IDE caching bound to file edits and VFS structural changes.
      */
     fun getIncludedFiles(file: PsiFile?): Set<PsiFile> {
         if (file == null || !file.isValid) return emptySet()
@@ -72,8 +34,27 @@ class LslIncludesCollector(private val project: Project) {
         return try {
             CachedValuesManager.getCachedValue(file) {
                 val visitedPaths = mutableSetOf<String>()
+                // Seed root file path key to catch immediate self-inclusions
+                visitedPaths.add(file.getPathKey())
+
                 val result = collectIncludedLslmFiles(file, depth = 0, visitedPaths)
-                CachedValueProvider.Result.create(result, file, PsiModificationTracker.MODIFICATION_COUNT)
+
+                // Dynamic Dependency List:
+                // 1. Root file
+                // 2. All transitively included sub-files
+                // 3. VFS modifications (for file creates/deletes)
+                val dependencies = mutableListOf<Any>(file, VirtualFileManager.VFS_STRUCTURE_MODIFICATIONS)
+                dependencies.addAll(result)
+
+                CachedValueProvider.Result.create(result, dependencies)
+
+                // Key Fix: Bind cache invalidation to this specific file and VFS structure changes
+                // (file additions/deletions/renames), preventing project-wide keystroke cache misses.
+//                CachedValueProvider.Result.create(
+//                    result,
+//                    file,
+//                    VirtualFileManager.VFS_STRUCTURE_MODIFICATIONS
+//                )
             } ?: emptySet()
         } catch (_: Exception) {
             emptySet()
@@ -83,7 +64,7 @@ class LslIncludesCollector(private val project: Project) {
     /**
      * Recursive collection of included .lslm files starting from a given PSI file.
      */
-    fun collectIncludedLslmFiles(
+    private fun collectIncludedLslmFiles(
         file: PsiFile?,
         depth: Int = 0,
         seenPaths: MutableSet<String> = mutableSetOf()
@@ -98,14 +79,12 @@ class LslIncludesCollector(private val project: Project) {
         for (includedPath in includePaths) {
             val includedPsi = resolveIncludeFile(includedPath, file, seenPaths) ?: continue
 
-            val path = includedPsi.virtualFile?.canonicalPath
-                ?: includedPsi.virtualFile?.path
-                ?: includedPsi.name
+            val path = includedPsi.getPathKey()
 
             // Check and add to global seenPaths BEFORE recursing down
             if (seenPaths.add(path)) {
                 // 1. Traverse child includes first (post-order / bottom-up dependency ordering)
-                LslDebug.log("ADD: name='${includedPsi.name}', path='$path'")
+                //LslDebug.log("ADD: name='${includedPsi.name}'")
 
                 val childIncludes = collectIncludedLslmFiles(
                     file = includedPsi,
@@ -117,23 +96,21 @@ class LslIncludesCollector(private val project: Project) {
                 rawResult.addAll(childIncludes)
                 rawResult.add(includedPsi)
             } else {
-                LslDebug.log("DUP: name='${includedPsi.name}', path='$path'")
+                //LslDebug.log("DUP: name='${includedPsi.name}', path='$path'")
             }
         }
 
         return rawResult
     }
 
-
     /**
-     * Used by Annotator & Reference targets: Resolves a relative or module-root `#include` path to a PsiFile.
+     * Used by Reference targets: Resolves a relative or module-root `#include` path to a PsiFile.
      */
     fun resolveIncludeFile(
         includedPath: String,
         containingFile: PsiFile,
         visitedFiles: Set<String> = emptySet()
     ): PsiFile? {
-
         val project = containingFile.project
         if (project.isDisposed || includedPath.isEmpty()) return null
 
@@ -151,48 +128,30 @@ class LslIncludesCollector(private val project: Project) {
             ?: containingFile.originalFile.virtualFile
             ?: containingFile.viewProvider.virtualFile
 
-        val parentDir = containingVF.parent
+        val parentDir = containingVF?.parent
 
         // --- 3. Resolve module content roots ---
         val allRoots = getModuleAndRoots(containingFile)
-        //DEBUG("    parentDir='${containingFile?.virtualFile?.parent?.path}'")
-        //DEBUG("    allRoots=${allRoots.map { it.path }}")
 
-        // --- 4. Search strategies (NO INDEXING) ---
-        fun searchInRoot(root: VirtualFile): VirtualFile? {
-            var found: VirtualFile? = null
-
-            VfsUtilCore.visitChildrenRecursively(root, object : VirtualFileVisitor<Any>() {
-                override fun visitFile(file: VirtualFile): Boolean {
-                    if (!file.isDirectory && file.name.equals(cleanName, ignoreCase = true)) {
-                        found = file
-                        return false // stop recursion
-                    }
-                    return true
-                }
-            })
-
-            return found
-        }
-
+        // --- 4. Search strategies (Index-accelerated) ---
+        // Uses FilenameIndex instead of recursive directory iteration for speed.
         val virtualFile =
             // A. Relative to containing file (CRITICAL for ../../Lib/...)
             parentDir?.findFileByRelativePath(targetPath)
             // B. Search in module content roots
                 ?: allRoots.firstNotNullOfOrNull { it.findFileByRelativePath(targetPath) }
-                // C. Direct VFS walk in all module roots (NO index)
-                ?: allRoots.firstNotNullOfOrNull { searchInRoot(it) }
+                // C. Fast index-backed lookup across project
+                ?: FilenameIndex.getVirtualFilesByName(cleanName, GlobalSearchScope.projectScope(project)).firstOrNull()
                 ?: return null
 
         // --- 5. Prevent recursive includes ---
-        val canonical = virtualFile.canonicalPath ?: virtualFile.path
-        if (canonical in visitedFiles) return null
+        if (virtualFile.getPathKey() in visitedFiles) return null
 
-        // --- 6. Sync document ---
-        val doc = FileDocumentManager.getInstance().getDocument(virtualFile)
-        if (doc != null && PsiDocumentManager.getInstance(project).isUncommited(doc)) {
-            PsiDocumentManager.getInstance(project).commitDocument(doc)
-        }
+        // --- 6. Sync document --- NO! Laggy and useless
+//        val doc = FileDocumentManager.getInstance().getDocument(virtualFile)
+//        if (doc != null && PsiDocumentManager.getInstance(project).isUncommited(doc)) {
+//            PsiDocumentManager.getInstance(project).commitDocument(doc)
+//        }
 
         // --- 7. Try PSI ---
         val psiFile = PsiManager.getInstance(project).findFile(virtualFile)
@@ -225,26 +184,68 @@ class LslIncludesCollector(private val project: Project) {
     }
 
     /**
-     * Lightweight scanner to extract direct include path strings from PSI file text.
+     * Fast line-by-line inspection using CharSequence to avoid heavy String allocations on keystrokes.
      */
-    fun extractIncludePaths(file: PsiFile): List<String> {
-        val text = file.text ?: return emptyList()
+    private fun extractIncludePaths(file: PsiFile): List<String> {
+        val text = file.viewProvider.contents
         val paths = mutableListOf<String>()
 
-        // Fast line-by-line inspection for `#include` directives
-        text.lineSequence().forEach { line ->
-            val trimmed = line.trim()
-            if (trimmed.startsWith("#include")) {
-                val path = trimmed.removePrefix("#include").trim()
-                if (path.isNotEmpty()) {
-                    paths.add(path)
+        var start = 0
+        val length = text.length
+
+        while (start < length) {
+            var end = text.indexOf('\n', start)
+            if (end == -1) end = length
+
+            // Fast inline whitespace skip
+            var lineStart = start
+            while (lineStart < end && text[lineStart].isWhitespace()) {
+                lineStart++
+            }
+
+            // Check for #include prefix directly in CharSequence
+            if (hasPrefixAt(text, lineStart, "#include")) {
+                val pathStart = lineStart + 8 // length of "#include"
+                val rawPath = text.subSequence(pathStart, end).toString().trim()
+                if (rawPath.isNotEmpty()) {
+                    paths.add(rawPath)
                 }
             }
+
+            start = end + 1
         }
         return paths
     }
 
-    fun getModuleAndRoots(file: PsiFile): List<VirtualFile> {
+    private fun hasPrefixAt(seq: CharSequence, index: Int, prefix: String): Boolean {
+        if (index + prefix.length > seq.length) return false
+        for (i in prefix.indices) {
+            if (seq[index + i] != prefix[i]) return false
+        }
+        return true
+    }
+
+    /**
+     * Lightweight scanner to extract direct include path strings from PSI file text.
+     */
+//    private fun extractIncludePaths(file: PsiFile): List<String> {
+//        val text = file.text ?: return emptyList()
+//        val paths = mutableListOf<String>()
+//
+//        // Fast line-by-line inspection for `#include` directives
+//        text.lineSequence().forEach { line ->
+//            val trimmed = line.trim()
+//            if (trimmed.startsWith("#include")) {
+//                val path = trimmed.removePrefix("#include").trim()
+//                if (path.isNotEmpty()) {
+//                    paths.add(path)
+//                }
+//            }
+//        }
+//        return paths
+//    }
+
+    private fun getModuleAndRoots(file: PsiFile): List<VirtualFile> {
         val containingVF = file.virtualFile
             ?: file.originalFile.virtualFile
             ?: file.viewProvider.virtualFile
@@ -261,5 +262,4 @@ class LslIncludesCollector(private val project: Project) {
 
         return (listOfNotNull(parentDir) + moduleRoots).distinct()
     }
-
 }

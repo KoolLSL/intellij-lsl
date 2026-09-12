@@ -1,7 +1,7 @@
 <idea-plugin>
     <id>io.github.koollsl.lsl</id>
     <name>LSL (Linden Scripting Language)</name>
-    <version>0.2.4</version>
+    <version>GENERATED-BY_build.gradle.kts</version>
 
     <vendor url="https://github.com/KoolLSL">KoolLSL</vendor>
 
@@ -273,7 +273,14 @@
                 displayName="Invalid event declaration"
                 enabledByDefault="true"
                 implementationClass="io.github.koollsl.lsl.inspections.LslInvalidEventDeclarationInspection"/>
-
+        <localInspection
+                language="LSL"
+                groupPath="LSL"
+                shortName="LslUnmatchedDirective"
+                displayName="Unmatched or unclosed #directive"
+                enabledByDefault="true"
+                implementationClass="io.github.koollsl.lsl.inspections.LslUnmatchedDirectiveInspection"
+                level="ERROR"/>
     </extensions>
 
     <actions>

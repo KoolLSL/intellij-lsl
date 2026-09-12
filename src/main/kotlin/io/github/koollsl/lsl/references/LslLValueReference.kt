@@ -44,11 +44,13 @@ class LslLValueReference(val element: LslLValue) :
 
         while (node != null) {
             when (node) {
+                // Check the variable is declared before usage, and is not in disabled code
                 is LslStatementBlock ->
                     result.addAll(
-                        node.children.takeWhile { it != node }
+                        node.children
+                            .takeWhile { it.textOffset < element.textOffset }
                             .filterIsInstance<LslStatementVariable>()
-                            .filter { it.name == element.variableName }
+                            .filter { it.name == element.variableName && !engine.isElementDisabled(it) }
                             .let { ArrayList(it).asReversed() }
                             .map { PsiElementResolveResult(it) }
                     )
@@ -73,7 +75,7 @@ class LslLValueReference(val element: LslLValue) :
                     // 1. Local file globals
                     val localGlobals = node.children
                         .filterIsInstance<LslGlobalVariable>()
-                        .filter { it.name == element.variableName }
+                        .filter { it.name == element.variableName && !engine.isElementDisabled(it) }
                         .let { ArrayList(it).asReversed() }
                         .map { PsiElementResolveResult(it) }
 
@@ -83,25 +85,12 @@ class LslLValueReference(val element: LslLValue) :
                         (file as? LslFile)?.children
                             ?.filterIsInstance<LslGlobalVariable>()
                             ?.filter { it.name == element.variableName }
+                            //?.filter { it.name == element.variableName&& !engine.isElementDisabled(it) }
                             ?.map { PsiElementResolveResult(it) }
                             ?: emptyList()
                     }
 
-                    // Not needed, and it is laggy! Included files are enough scope
-                    // 3. Workspace library globals (.lslp / .lslm)
-//                    val lslpVirtualFiles = listOf("lslp", "lslm").flatMap { ext ->
-//                        FilenameIndex.getAllFilesByExt(project, ext, GlobalSearchScope.projectScope(project))
-//                    }
-//                    val lslpGlobals = lslpVirtualFiles.flatMap { virtualFile ->
-//                        val psiFile = PsiManager.getInstance(project).findFile(virtualFile) as? LslFile
-//                        psiFile?.children
-//                            ?.filterIsInstance<LslGlobalVariable>()
-//                            ?.filter { it.name == element.variableName }
-//                            ?.map { PsiElementResolveResult(it) }
-//                            ?: emptyList()
-//                    }
-
-                    // 4. Built‑in constants
+                    // 3. Built‑in constants
                     val builtinConstants = listOfNotNull(
                         KwdbData.getInstance(project).constants[element.variableName]
                     ).map { PsiElementResolveResult(it) }

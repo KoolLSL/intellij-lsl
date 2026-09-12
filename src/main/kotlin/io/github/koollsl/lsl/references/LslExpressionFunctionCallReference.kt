@@ -48,6 +48,7 @@ class LslExpressionFunctionCallReference(val element: LslExpressionFunctionCall)
         val localFunctions = element.containingFile.children
             .filterIsInstance<LslFunction>()
             .filter { it.name == functionName }
+        //.filter { it.name == functionName && !engine.isElementDisabled(it)}
 
         // 2. Included files
         val includedFiles =
@@ -56,23 +57,11 @@ class LslExpressionFunctionCallReference(val element: LslExpressionFunctionCall)
             (file as? LslFile)?.children
                 ?.filterIsInstance<LslFunction>()
                 ?.filter { it.name == functionName }
+            //?.filter { it.name == functionName && !engine.isElementDisabled(it)}
                 ?: emptyList()
         }
 
-        // Not needed, and it is laggy! Included files are enough scope
-        // 3. Workspace library files (.lslp / .lslm)
-//        val lslpVirtualFiles = listOf("lslp", "lslm").flatMap { ext ->
-//            FilenameIndex.getAllFilesByExt(project, ext, GlobalSearchScope.projectScope(project))
-//        }
-//        val lslpFunctions = lslpVirtualFiles.flatMap { virtualFile ->
-//            val psiFile = PsiManager.getInstance(project).findFile(virtualFile) as? LslFile
-//            psiFile?.children
-//                ?.filterIsInstance<LslFunction>()
-//                ?.filter { it.name == functionName }
-//                ?: emptyList()
-//        }
-
-        // 4. Built‑in functions
+        // 3. Built‑in functions
         val builtinFunctions = listOfNotNull(
             KwdbData.getInstance(project).functions[functionName]
         )

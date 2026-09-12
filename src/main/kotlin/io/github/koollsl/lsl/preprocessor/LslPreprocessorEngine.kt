@@ -10,22 +10,20 @@ import com.intellij.openapi.module.ModuleUtilCore
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.ModuleRootManager
 import com.intellij.openapi.roots.ProjectRootManager
+import com.intellij.openapi.util.Key
 import com.intellij.openapi.util.TextRange
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.*
-import com.intellij.psi.util.CachedValueProvider
-import com.intellij.psi.util.CachedValuesManager
-import com.intellij.psi.util.PsiModificationTracker
-import com.intellij.psi.util.PsiTreeUtil
+import com.intellij.psi.util.*
 import io.github.koollsl.lsl.KwdbData
 import io.github.koollsl.lsl.LslPrimitiveType
 import io.github.koollsl.lsl.parser.LslTypes
 import io.github.koollsl.lsl.psi.*
 import io.github.koollsl.lsl.safeguards.LslBuildOutputNotificationProvider
 import io.github.koollsl.lsl.settings.LslSettings
-import io.github.koollsl.lsl.utils.LslDebug
+import io.github.koollsl.lsl.utils.getPathKey
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -41,55 +39,166 @@ class LslPreprocessorEngine(private val project: Project) {
     private val DIRECTIVE_REGEX = Regex("""^\s*#\s*([a-zA-Z_]\w*)(?:\s+(.*)|$)""")
     private val LOG = Logger.getInstance(LslPreprocessorEngine::class.java)
 
+    // Unique key to store the cached result on the PsiFile
+    private val PROCESSED_SOURCE_KEY =
+        Key.create<CachedValue<ProcessedSource>>("PROCESSED_SOURCE")
+
     private data class BlockState(
         val parentActive: Boolean,
         var conditionMet: Boolean,
-        var currentBranchActive: Boolean
+        var currentBranchActive: Boolean,
+        val lineStart: Int // Track line number where block opened
     )
 
-    data class PreprocessorContext(
+    /**
+     * Input configuration and state tracking passed down the preprocessor execution tree.
+     */
+    data class SourceContext(
         val file: PsiFile?,
         val project: Project,
-        val definitions: MutableMap<String, String> = mutableMapOf(),
+        val definitions: Map<String, String> = emptyMap(),
         val visitedFiles: MutableSet<String> = mutableSetOf(),
-        val isRecursing: Boolean = false, // Prevents clearing tracking sets during recursive sub-calls
         val depth: Int = 0,
-        val markIncludes: Boolean = false,
-        val includeCounter: AtomicInteger = AtomicInteger(0),
-        val onNormalLine: ((lineText: String) -> Unit)? = null,
-        val onInactiveLine: ((lineNumber: Int) -> Unit)? = null,
-        val onInlineDirective: ((rawArgs: String) -> Unit)? = null,
-        val onIncludeResolved: ((includedPsi: PsiFile, context: PreprocessorContext) -> Unit)? = null,
-        val onIncludeFailed: ((includedPath: String, lineNumber: Int) -> Unit)? = null,
+        val includeCounter: Int = 0
+    ) {
+        /**
+         * Prepares a child context when stepping into an included file.
+         * Increments recursion depth and tracks visited paths to prevent infinite recursion loops.
+         */
+        fun forChild(targetFile: PsiFile, targetPath: String): SourceContext {
+            visitedFiles.add(targetPath) // Modifies the shared set instance
+            return copy(
+                file = targetFile,
+                depth = depth + 1,
+                includeCounter = includeCounter + 1
+            )
+        }
+    }
+
+    /**
+     * Output data produced by preprocessing execution.
+     */
+    data class ProcessedSource(
+        val expandedText: String,
+        val definitions: Map<String, String> = emptyMap(),
+        val disabledLineNumbers: List<Int> = emptyList(),
+        val diagnostics: List<SourceDiagnostic> = emptyList(),
+        val includedFiles: List<PsiFile> = emptyList(),
+        val processedIncludeCount: Int = 0
     )
 
+    /**
+     * Structural anomaly or syntax issue detected during preprocessing.
+     */
+    sealed interface SourceDiagnostic {
+        val lineNumber: Int
+
+        data class UnmatchedElseOrEndif(
+            override val lineNumber: Int,
+            val directive: String
+        ) : SourceDiagnostic
+
+        data class UnclosedBlockAtEof(
+            override val lineNumber: Int,
+            val directive: String
+        ) : SourceDiagnostic
+
+        data class UnknownDirective(
+            override val lineNumber: Int,
+            val directive: String
+        ) : SourceDiagnostic
+
+        data class IncludeFailed(
+            override val lineNumber: Int,
+            val path: String
+        ) : SourceDiagnostic
+    }
     private fun VirtualFile.toPsi(): PsiFile? =
         PsiManager.getInstance(project).findFile(this)
 
     private fun PsiFile.toVf(): VirtualFile? =
         this.virtualFile
 
+    /**
+     * Retrieves the cached preprocessor result for the file,
+     * or creates it if the file was modified since the last check.
+     */
+//    fun getCachedProcessDirectives(ctx: PreprocessorContext): PreprocessorContext {
+//        val file = ctx.file ?: return ctx
+//        if (!file.isValid) return ctx
+//
+//        return CachedValuesManager.getCachedValue(file, PREPROCESSOR_STATE_KEY) {
+//            // Do a fresh directives retrieval on the context
+//            processDirectives(ctx)
+//
+//            // Cache invalidates when PSI modifications occur anywhere in the project
+//            // (critical for cross-file #include updates)
+//            CachedValueProvider.Result.create(
+//                ctx,
+//                PsiModificationTracker.MODIFICATION_COUNT
+//            )
+//        }
+//    }
+    fun getCachedProcessDirectives(ctx: SourceContext): ProcessedSource {
+        val file = ctx.file ?: return ProcessedSource(expandedText = "")
 
-    private fun walkPreprocessorDirectives(ctx: PreprocessorContext) {
-        val file = ctx.file ?: return
+        return CachedValuesManager.getManager(ctx.project).getCachedValue(
+            file,
+            PROCESSED_SOURCE_KEY,
+            {
+                val result = processDirectives(ctx, false)
+
+                CachedValueProvider.Result.create(
+                    result,
+                    file, // Invalidates cache when the PSI file is modified
+                    ProjectRootManager.getInstance(ctx.project) // Invalidates when project dependencies change
+                )
+            },
+            false // trackValue = false (standard for AST/PSI dependencies)
+        )
+    }
+
+
+    /**
+     * Processes preprocessor directives for a given source context.
+     *
+     * Workflow Overview:
+     * 1. Validation & Setup: Guard against null files, invalid PSI, disposed projects, or maximum include recursion depth.
+     * 2. Identity Tracking: Collect file identifiers (paths) to prevent recursive self-inclusion loops.
+     * 3. Line-by-Line Lexing: Parse directives (#if, #ifdef, #define, #include, etc.) using a branch evaluation stack.
+     * 4. Content Aggregation: Collect enabled source lines into [StringBuilder], track disabled line numbers for highlighting,
+     *    and append diagnostics for unmatched/unclosed directives or missing include files.
+     * 5. Recursive Includes: When a valid `#include` is encountered in an active branch, recurse into the target file via
+     *    [SourceContext.forChild] and merge its produced text, definitions, and diagnostics into the parent result.
+     * 6. EOF Validation: Report unclosed `#if` blocks remaining on the stack at the end of the file.
+     *
+     * @param ctx Immutable input configuration and state tracking.
+     * @return Fully aggregated [ProcessedSource] result.
+     */
+    fun processDirectives(ctx: SourceContext, markIncludes: Boolean): ProcessedSource {
+        val file = ctx.file ?: return ProcessedSource(expandedText = "")
         val project = ctx.project
-        if (ctx.depth > MAX_INCLUDE_DEPTH || !file.isValid || project.isDisposed) return
-        val text = file.text
 
-        val currentIdentifiers = mutableSetOf<String>().apply {
-            file.virtualFile?.path?.let { add(it) }
-            file.virtualFile?.canonicalPath?.let { add(it) }
-            file.originalFile.virtualFile?.path?.let { add(it) }
-            file.originalFile.virtualFile?.canonicalPath?.let { add(it) }
-            /// BUG? add(file.name)
+        // Guard clause: enforce safety limits against excessive depth, invalid PSI, or cancelled project scopes
+        if (ctx.depth > MAX_INCLUDE_DEPTH || !file.isValid || project.isDisposed) {
+            return ProcessedSource(expandedText = "")
         }
 
-        val currentVisited = ctx.visitedFiles + currentIdentifiers
+        val text = file.text
+
+        // Output accumulators
+        val expandedTextBuilder = StringBuilder()
+        val localDefinitions = ctx.definitions.toMutableMap()
+        val disabledLineNumbers = mutableListOf<Int>()
+        val diagnostics = mutableListOf<SourceDiagnostic>()
+        var totalIncludesProcessed = ctx.includeCounter
+        var includeSeq = 0
+
+        // Conditional branch evaluation stack tracking active/inactive preprocessor regions
         val stack = ArrayDeque<BlockState>()
 
-        //DEBUG("walkPreprocessorDirectives file: '${file?.name}' project: '${project.name}' depth=${ctx.depth} currentVisited=${currentVisited}")
         for ((index, line) in text.lineSequence().withIndex()) {
-            val lineNumber = index + 1 // 1-based line number
+            val lineNumber = index + 1 // 1-based index for diagnostics and IDE line highlighting
             val trimmed = line.trim()
             val match = DIRECTIVE_REGEX.find(trimmed)
 
@@ -102,91 +211,176 @@ class LslPreprocessorEngine(private val project: Project) {
                     "ifdef" -> {
                         val parentActive = isCurrentlyActive(stack)
                         val ident = args.split(Regex("""\s+""")).firstOrNull()?.trim() ?: ""
-                        val cond = parentActive && ident.isNotEmpty() && ctx.definitions.containsKey(ident)
-                        stack.addLast(BlockState(parentActive, cond, cond))
+                        val cond = parentActive && ident.isNotEmpty() && localDefinitions.containsKey(ident)
+                        stack.addLast(BlockState(parentActive, cond, cond, lineNumber))
                     }
+
                     "ifndef" -> {
                         val parentActive = isCurrentlyActive(stack)
                         val ident = args.split(Regex("""\s+""")).firstOrNull()?.trim() ?: ""
-                        val cond = parentActive && (ident.isEmpty() || !ctx.definitions.containsKey(ident))
-                        stack.addLast(BlockState(parentActive, cond, cond))
+                        val cond = parentActive && (ident.isEmpty() || !localDefinitions.containsKey(ident))
+                        stack.addLast(BlockState(parentActive, cond, cond, lineNumber))
                     }
+
                     "if" -> {
                         val parentActive = isCurrentlyActive(stack)
-                        val cond = parentActive && evaluateCondition(args, ctx.definitions)
-                        stack.addLast(BlockState(parentActive, cond, cond))
+                        val cond = parentActive && evaluateCondition(args, localDefinitions)
+                        stack.addLast(BlockState(parentActive, cond, cond, lineNumber))
                     }
 
-                    "elif" -> if (stack.isNotEmpty()) {
-                        val top = stack.last()
-                        val cond = top.parentActive && !top.conditionMet && evaluateCondition(args, ctx.definitions)
-                        top.currentBranchActive = cond
-                        if (cond) top.conditionMet = true
-                    }
-
-                    "else" -> if (stack.isNotEmpty()) {
-                        val top = stack.last()
-                        val cond = top.parentActive && !top.conditionMet
-                        top.currentBranchActive = cond
-                        top.conditionMet = true
-                    }
-
-                    "endif" -> if (stack.isNotEmpty())
-                        stack.removeLast()
-
-                    "define" -> if (isCurrentlyActive(stack))
-                        LslDirectiveEvaluator.parseAndAddDefine(args, ctx.definitions)
-                    "undef" -> if (isCurrentlyActive(stack)) {
-                        val ident = args.split(Regex("""\s+""")).firstOrNull()?.trim() ?: ""
-                        if (ident.isNotEmpty()) ctx.definitions.remove(ident)
-                    }
-
-                    "inline" -> if (isCurrentlyActive(stack)) {
-                        val prefixCode = line.substring(0, match.range.first)
-                        if (prefixCode.trim().isNotEmpty()) {
-                            ctx.onNormalLine?.invoke(prefixCode)
+                    "elif" -> {
+                        if (stack.isEmpty()) {
+                            diagnostics.add(SourceDiagnostic.UnmatchedElseOrEndif(lineNumber, directive))
+                        } else {
+                            val top = stack.last()
+                            val cond =
+                                top.parentActive && !top.conditionMet && evaluateCondition(args, localDefinitions)
+                            top.currentBranchActive = cond
+                            if (cond) top.conditionMet = true
                         }
-                        ctx.onInlineDirective?.invoke(rawArgs.trimEnd())
                     }
-                    "include" -> if (isCurrentlyActive(stack)) {
-                        val includedPath = args.trim().trim('"', '<', '>')
-                        if (includedPath.isNotEmpty()) {
-                            val collector = LslIncludesCollector.getInstance(project)
-                            val includedPsi = collector.resolveIncludeFile(includedPath, file)
 
-                            if (includedPsi != null && includedPsi.isValid) {
-                                val pathKey = includedPsi.virtualFile?.canonicalPath
-                                    ?: includedPsi.virtualFile?.path
-                                    ?: includedPsi.name
+                    "else" -> {
+                        if (stack.isEmpty()) {
+                            diagnostics.add(SourceDiagnostic.UnmatchedElseOrEndif(lineNumber, directive))
+                        } else {
+                            val top = stack.last()
+                            val cond = top.parentActive && !top.conditionMet
+                            top.currentBranchActive = cond
+                            top.conditionMet = true
+                        }
+                    }
 
-                                // VÉRIFICATION DÉDOUBLONNAGE : Ne pas ré-inclure si déjà dans visitedFiles
-                                if (ctx.visitedFiles.add(pathKey)) { // add() updates the set AND returns true if pathKey was new
-                                    val newCtx = ctx.copy(
-                                        file = includedPsi,
-                                        depth = ctx.depth + 1
-                                        // visitedFiles is already updated in-place and shared automatically
-                                    )
-                                    ctx.onIncludeResolved?.invoke(includedPsi, newCtx)
-                                    LslDebug.log("#include RESOLVED: $pathKey")
+                    "endif" -> {
+                        if (stack.isEmpty()) {
+                            diagnostics.add(SourceDiagnostic.UnmatchedElseOrEndif(lineNumber, directive))
+                        } else {
+                            stack.removeLast()
+                        }
+                    }
 
-                                } else {
-                                    // Fichier déjà inliné plus haut dans l'arbre d'inclusion
-                                    LslDebug.log("#include SKIP (already inlined) : $pathKey")
-                                }
-                            } else {
-                                ctx.onIncludeFailed?.invoke(includedPath, lineNumber)
+                    "define" -> {
+                        if (isCurrentlyActive(stack)) {
+                            LslDirectiveEvaluator.parseAndAddDefine(args, localDefinitions)
+                        }
+                    }
+
+                    "undef" -> {
+                        if (isCurrentlyActive(stack)) {
+                            val ident = args.split(Regex("""\s+""")).firstOrNull()?.trim() ?: ""
+                            if (ident.isNotEmpty()) {
+                                localDefinitions.remove(ident)
                             }
+                        }
+                    }
+
+                    "inline" -> {
+                        if (isCurrentlyActive(stack)) {
+                            // Preserve any code preceding the #inline directive on the same line
+                            val prefixCode = line.substring(0, match.range.first)
+                            if (prefixCode.trim().isNotEmpty()) {
+                                expandedTextBuilder.appendLine(prefixCode)
+                            }
+                            // Emit a synthetic marker comment so performInlining can pick it up
+                            expandedTextBuilder.appendLine("// __LSL_INLINE__")
+                            expandedTextBuilder.appendLine(rawArgs.trimEnd())
+                        } else {
+                            disabledLineNumbers.add(lineNumber)
+                        }
+                    }
+
+                    "include" -> {
+                        if (isCurrentlyActive(stack)) {
+                            val includedPath = args.trim().trim('"', '<', '>')
+                            if (includedPath.isNotEmpty()) {
+                                val collector = LslIncludesCollector.getInstance(project)
+                                val includedPsi = collector.resolveIncludeFile(includedPath, file)
+
+                                if (includedPsi != null && includedPsi.isValid) {
+                                    val pathKey = includedPsi.getPathKey()
+
+                                    //LslDebug.log("pathKey $pathKey")
+                                    // Check against local visited set (seeded from ctx.visitedFiles)
+                                    if (pathKey !in ctx.visitedFiles) {
+                                        ctx.visitedFiles.add(pathKey)
+
+                                        // Pass immutable snapshot downstream to child context
+                                        val childCtx = ctx.forChild(includedPsi, pathKey)
+
+                                        // Recursive execution returning child result
+                                        val childResult = processDirectives(childCtx, markIncludes)
+
+                                        // Wrap child result with include markers for emitSection parsing
+                                        if (markIncludes) {
+                                            val id = ++includeSeq
+                                            val incName = includedPsi.name
+                                            expandedTextBuilder.appendLine("// __LSL_INC_START__:$id:$incName")
+                                            if (childResult.expandedText.isNotEmpty()) {
+                                                expandedTextBuilder.append(childResult.expandedText)
+                                                if (!childResult.expandedText.endsWith("\n")) {
+                                                    expandedTextBuilder.appendLine()
+                                                }
+                                            }
+                                            expandedTextBuilder.appendLine("// __LSL_INC_END__:$id:$incName")
+                                        } else {
+                                            expandedTextBuilder.append(childResult.expandedText)
+                                        }
+
+                                        // Merge child outputs into parent execution state
+                                        localDefinitions.putAll(childResult.definitions)
+                                        diagnostics.addAll(childResult.diagnostics)
+                                        totalIncludesProcessed += childResult.processedIncludeCount + 1
+
+                                        //LslDebug.log("#include RESOLVED: $includedPsi.name")
+                                    } else {
+                                        //LslDebug.log("#include SKIP (already inlined in dependency branch): $pathKey")
+                                    }
+                                } else {
+                                    diagnostics.add(SourceDiagnostic.IncludeFailed(lineNumber, includedPath))
+                                }
+                            }
+                        } else {
+                            disabledLineNumbers.add(lineNumber)
+                        }
+                    }
+
+                    else -> {
+                        if (isCurrentlyActive(stack)) {
+                            // Unrecognized directive starting with '#' in an active code section
+                            diagnostics.add(SourceDiagnostic.UnknownDirective(lineNumber, directive))
+                        } else {
+                            disabledLineNumbers.add(lineNumber)
                         }
                     }
                 }
             } else {
+                // Standard source line (no preprocessor directive detected)
                 if (isCurrentlyActive(stack)) {
-                    ctx.onNormalLine?.invoke(line)
+                    expandedTextBuilder.appendLine(line)
                 } else {
-                    ctx.onInactiveLine?.invoke(lineNumber)
+                    disabledLineNumbers.add(lineNumber)
                 }
             }
         }
+
+        // EOF Diagnostic Check: Detect unclosed #if / #ifdef / #ifndef blocks
+        while (stack.isNotEmpty()) {
+            val unclosed = stack.removeLast()
+            diagnostics.add(
+                SourceDiagnostic.UnclosedBlockAtEof(
+                    lineNumber = unclosed.lineStart,
+                    directive = "unclosed preprocessor block"
+                )
+            )
+        }
+
+        return ProcessedSource(
+            expandedText = expandedTextBuilder.toString(),
+            definitions = localDefinitions,
+            disabledLineNumbers = disabledLineNumbers,
+            diagnostics = diagnostics,
+            processedIncludeCount = totalIncludesProcessed
+        )
     }
 
     fun isElementDisabled(element: PsiElement?): Boolean {
@@ -212,18 +406,12 @@ class LslPreprocessorEngine(private val project: Project) {
     fun getDisabledRanges(file: PsiFile?): List<TextRange> {
         if (file == null || !file.isValid) return emptyList()
 
-        // Fast-path text check: if the file contains no preprocessor directives, return early
-        val text = file.text
-        if (!text.contains("#if")) return emptyList()
-
         return CachedValuesManager.getCachedValue(file) {
             val ranges = runCatching { computeDisabledRanges(file) }.getOrDefault(emptyList())
-            CachedValueProvider.Result.create(
-                ranges,
-                PsiModificationTracker.MODIFICATION_COUNT
-            )
+            CachedValueProvider.Result.create(ranges, file)
         }
     }
+
 
     /**
      * Checks if a specific TextRange is fully contained within any disabled preprocessor range in the file.
@@ -389,7 +577,7 @@ class LslPreprocessorEngine(private val project: Project) {
 //            for (lslmPsi in referencedLslmFiles) {
 //                lslmPsi.toVf()?.refresh(false, false)
 //            }
-            // Direct save on .lslp -> walkPreprocessorDirectives dynamically resolves all #includes
+            // Direct save on .lslp -> getCachedProcessDirectives dynamically resolves all #includes
             processLslpFile(virtualFile, project)
         } else {
             // Saving an .lslm header: refresh itself first
@@ -598,18 +786,18 @@ class LslPreprocessorEngine(private val project: Project) {
         if (file.project.isDisposed || !file.isValid) return ""
 
         // 1. Expand includes and directives into text
-        val definitions = initialDefinitions.toMutableMap()
-        val visitedFiles = mutableSetOf<String>()
-        val includeCounter = AtomicInteger(0)
-        val expandedCode = expandDirectives(
+        val sourceCtx = SourceContext(
             file = file,
             project = file.project,
-            definitions = definitions,
-            visitedFiles = visitedFiles,
+            definitions = initialDefinitions,
+            visitedFiles = mutableSetOf(), // Mutable set shared across all includes
             depth = 0,
-            markIncludes = true,
-            includeCounter = includeCounter
+            includeCounter = 0
         )
+        // Direct call to not use the cache and force markIncludes
+        val processed = processDirectives(sourceCtx, true)
+        val expandedCode = processed.expandedText
+
 
         // 2. Perform function inlining
         val inliningResult = performInlining(expandedCode, file.project)
@@ -741,13 +929,9 @@ class LslPreprocessorEngine(private val project: Project) {
             val plugin = PluginManagerCore.getPlugin(PluginId.getId("io.github.koollsl.lsl"))
             val pluginPath = plugin?.pluginPath
             val fileName = pluginPath?.fileName?.toString() ?: "unknown"
+            val version = plugin?.version ?: "UNKNOWN"
 
-            val zipTimestamp = pluginPath?.toFile()?.lastModified()?.let { Date(it) }
-            val timeString = zipTimestamp?.let {
-                SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(it)
-            } ?: "UNKNOWN"
-
-            return "$fileName $timeString"
+            return "$fileName $version"
         }
 
         fun shortenPath(project: Project, path: String): String {
@@ -805,117 +989,29 @@ class LslPreprocessorEngine(private val project: Project) {
     }
 
 
-    fun expandDirectives(
-        file: PsiFile?,
-        project: Project,
-        definitions: MutableMap<String, String> = mutableMapOf(),
-        visitedFiles: MutableSet<String> = mutableSetOf(),
-        depth: Int = 0,
-        markIncludes: Boolean = false,
-        includeCounter: AtomicInteger = AtomicInteger(0)
-    ): String {
-        if (file == null || !file.isValid) return ""
-        if (project.isDisposed) return ""
-
-        //val path = file.virtualFile?.path ?: file.name
-        val result = StringBuilder()
-
-        walkPreprocessorDirectives(
-            PreprocessorContext(
-                file = file,
-                project = project,
-                definitions = definitions,
-                visitedFiles = visitedFiles,
-                depth = depth,
-                markIncludes = markIncludes,
-                includeCounter = includeCounter,
-
-                onNormalLine = { lineText -> result.appendLine(lineText) },
-
-                onInlineDirective = { rawArgs ->
-                    result.appendLine("// __LSL_INLINE__")
-                    if (rawArgs.trim().isNotEmpty()) result.appendLine(rawArgs.trim())
-                },
-
-                onIncludeResolved = { includedPsi, ctx ->
-                    val code = expandDirectives(
-                        includedPsi,
-                        ctx.project,
-                        ctx.definitions,
-                        ctx.visitedFiles,
-                        ctx.depth + 1,
-                        ctx.markIncludes,
-                        ctx.includeCounter
-                    )
-
-                    if (ctx.markIncludes) {
-                        val id = ctx.includeCounter.incrementAndGet()
-                        val incName = includedPsi.name
-                        result.appendLine("// __LSL_INC_START__:$id:$incName")
-                        if (code.isNotEmpty()) result.appendLine(code)
-                        result.appendLine("// __LSL_INC_END__:$id:$incName")
-                    } else {
-                        if (code.isNotEmpty()) result.appendLine(code)
-                    }
-                }
-
-            )
-        )
-
-        return result.toString()
-    }
-
-
 
     fun computeDisabledRanges(file: PsiFile?): List<TextRange> {
-        if (file == null || !file.isValid) return emptyList()
-        if (file.project.isDisposed) return emptyList()
+        if (file == null || !file.isValid || file.project.isDisposed) return emptyList()
 
         val document = PsiDocumentManager.getInstance(file.project).getDocument(file) ?: return emptyList()
-        val rawDisabledRanges = mutableListOf<TextRange>()
 
-        walkPreprocessorDirectives(
-            PreprocessorContext(
-                file = file,
-                project = file.project,
-                onInactiveLine = { lineNumber ->
-                    val lineIndex = lineNumber - 1
-                    if (lineIndex in 0 until document.lineCount) {
-                        val start = document.getLineStartOffset(lineIndex)
-                        val end = document.getLineEndOffset(lineIndex)
-                        if (end > start) {
-                            rawDisabledRanges.add(TextRange(start, end))
-                        }
-                    }
-                },
-                onIncludeResolved = { includedPsi, childCtx ->
-                    collectDefinitionsFromInclude(
-                        childCtx.copy(file = includedPsi)
-                    )
-                }
-            )
+        val sourceCtx = SourceContext(
+            file = file,
+            project = file.project
         )
+
+        val processed = getCachedProcessDirectives(sourceCtx)
+
+        val rawDisabledRanges = processed.disabledLineNumbers.mapNotNull { lineNumber ->
+            val lineIndex = lineNumber - 1
+            if (lineIndex in 0 until document.lineCount) {
+                val start = document.getLineStartOffset(lineIndex)
+                val end = document.getLineEndOffset(lineIndex)
+                if (end > start) TextRange(start, end) else null
+            } else null
+        }
 
         return mergeContiguousRanges(rawDisabledRanges)
-    }
-
-
-
-    fun collectDefinitionsFromInclude(
-        ctx: PreprocessorContext
-    ) {
-        val file = ctx.file
-        if (file == null || !file.isValid || ctx.depth > MAX_INCLUDE_DEPTH || ctx.project.isDisposed) return
-
-        walkPreprocessorDirectives(
-            ctx.copy(
-                onIncludeResolved = { includedPsi, childCtx ->
-                    collectDefinitionsFromInclude(
-                        childCtx.copy(file = includedPsi)
-                    )
-                }
-            )
-        )
     }
 
     data class InliningResult(
@@ -2011,5 +2107,6 @@ class LslPreprocessorEngine(private val project: Project) {
         merged.add(TextRange(currentStart, currentEnd))
         return merged
     }
+
 
 }

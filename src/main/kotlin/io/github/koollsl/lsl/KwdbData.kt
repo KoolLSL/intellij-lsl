@@ -2,7 +2,9 @@ package io.github.koollsl.lsl
 
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Key
+import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VfsUtil
+import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiManager
 import com.intellij.psi.util.PsiTreeUtil
@@ -10,8 +12,6 @@ import com.intellij.psi.xml.XmlFile
 import com.intellij.psi.xml.XmlTag
 import com.intellij.xml.util.XmlUtil
 import io.github.koollsl.lsl.psi.*
-import com.intellij.openapi.vfs.LocalFileSystem
-import com.intellij.openapi.vfs.VirtualFile
 import io.github.koollsl.lsl.settings.LslSettings
 import java.nio.file.Path
 
@@ -36,20 +36,6 @@ class KwdbData(val project: Project) {
             data
         }
     }
-
-    /*
-    init {
-        val resource = ResourceUtil.getResource(javaClass.classLoader, ".", "kwdb.xml")
-        val file = VfsUtil.findFileByURL(resource)
-        data = PsiManager.getInstance(project).findFile(file!!) as XmlFile
-
-        generated = LslElementFactory.createFile(project, generateSource())
-
-        functions = generated.children.filterIsInstance<LslFunction>().associateBy { it.name!! }
-        constants = generated.children.filterIsInstance<LslGlobalVariable>().associateBy { it.name!! }
-        events = PsiTreeUtil.collectElementsOfType(generated, LslEvent::class.java).associateBy { it.name!! }
-    }
-    */
 
     init {
         val xmlVirtualFile: VirtualFile = findCustomOrResourceKwdb()

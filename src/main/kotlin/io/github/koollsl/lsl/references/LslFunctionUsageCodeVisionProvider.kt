@@ -8,6 +8,7 @@ import com.intellij.codeInsight.codeVision.ui.model.TextCodeVisionEntry
 import com.intellij.codeInsight.hints.codeVision.DaemonBoundCodeVisionProvider
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.IdeActions
+import com.intellij.openapi.components.service
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.roots.ProjectRootManager
 import com.intellij.openapi.util.TextRange
@@ -19,6 +20,7 @@ import com.intellij.psi.search.PsiSearchHelper
 import com.intellij.psi.search.UsageSearchContext
 import com.intellij.psi.util.PsiTreeUtil
 import io.github.koollsl.lsl.parser.LslTypes
+import io.github.koollsl.lsl.preprocessor.LslPreprocessorEngine
 import io.github.koollsl.lsl.psi.ASTWrapperLslNamedElement
 import io.github.koollsl.lsl.psi.LslFunction
 import io.github.koollsl.lsl.psi.LslGlobalVariable
@@ -47,15 +49,24 @@ class LslFunctionUsageCodeVisionProvider : DaemonBoundCodeVisionProvider {
         if (ProjectRootManager.getInstance(file.project).fileIndex.isExcluded(vFile)) {
             return emptyList()
         }
+        val engine = file.project.service<LslPreprocessorEngine>()
+
         val functions = PsiTreeUtil.findChildrenOfType(file, LslFunction::class.java)
         val globalVars = PsiTreeUtil.findChildrenOfType(file, LslGlobalVariable::class.java)
-        val targets = (functions + globalVars).filterIsInstance<ASTWrapperLslNamedElement>()
+
+        // Filter out target declarations that are in disabled preprocessor blocks
+        val targets = (functions + globalVars)
+            .filterIsInstance<ASTWrapperLslNamedElement>()
+            .filter { !engine.isElementDisabled(it) }
 
         if (targets.isEmpty()) return emptyList()
 
         // 1. Build a fast lookup map: Name -> List of target PSI declarations
-        val targetMap = targets.groupBy { it.name }
-            .filterKeys { !it.isNullOrEmpty() } as Map<String, List<ASTWrapperLslNamedElement>>
+        // 1. Build a fast lookup map: Name -> List of target PSI declarations
+        val targetMap: Map<String, List<ASTWrapperLslNamedElement>> = targets
+            .filter { !it.name.isNullOrEmpty() }
+            .groupBy { it.name!! }
+             
         val usageCounts = targets.associateWith { 0 }.toMutableMap()
 
         val isModule = file.virtualFile?.extension?.equals("lslm", ignoreCase = true) == true
@@ -68,7 +79,7 @@ class LslFunctionUsageCodeVisionProvider : DaemonBoundCodeVisionProvider {
                 var count = 0
                 PsiSearchHelper.getInstance(file.project).processElementsWithWord(
                     { element, _ ->
-                        if (element.node.elementType == LslTypes.IDENTIFIER) {
+                        if (element.node.elementType == LslTypes.IDENTIFIER && !engine.isElementDisabled(element)) {
                             val parentNamed =
                                 PsiTreeUtil.getParentOfType(element, ASTWrapperLslNamedElement::class.java)
                             if (parentNamed != target) {
@@ -88,6 +99,11 @@ class LslFunctionUsageCodeVisionProvider : DaemonBoundCodeVisionProvider {
             // 2. High-speed single pass for standard files: Count matching leaf tokens directly
             PsiTreeUtil.processElements(file) { element ->
                 if (element.node.elementType == LslTypes.IDENTIFIER) {
+                    // Skip tokens inside disabled preprocessor ranges
+                    if (engine.isElementDisabled(element)) {
+                        return@processElements true
+                    }
+
                     val text = element.text
                     val matchingTargets = targetMap[text]
                     if (matchingTargets != null) {

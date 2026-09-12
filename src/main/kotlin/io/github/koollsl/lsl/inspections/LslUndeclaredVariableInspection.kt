@@ -23,6 +23,7 @@ class LslUndeclaredVariableInspection : LocalInspectionTool() {
 
         return object : LslElementVisitor() {
             override fun visitLValue(lValue: LslLValue) {
+
                 // 2. Preprocessor check FIRST before evaluating L-values
                 if (preprocessorEngine.isDisabledText(file, lValue.textRange)) return
 

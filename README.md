@@ -7,7 +7,8 @@ Write LSL (Linden Script Language) directly inside IntelliJ IDEA, PyCharm, Andro
 ### Key Features
 
 * **Project & File Organization:** Manage large multi-file projects using structured project views, shared library, local history, file comparison, GitHub integration, and more.
-* **Advanced Preprocessor:** Use file inclusions (`#include`), function inlining (`#inline`), and conditional blocks (`#ifdef`, `#ifndef`, `#else`, `#endif`) to organize large script projects.
+* **Advanced Preprocessor:** Use file inclusions (`#include`), function inlining (`#inline`), and conditional blocks
+  (`#ifdef`...) to organize large script projects.
 * **Memory Optimization:** Built-in constant optimization evaluates static math, replaces fixed variables, and eliminates dead code before compiling — keeping your script's memory footprint as small as possible in Second Life.
 * **LSL Database:** Use the popular [kwdb.xml](https://github.com/Sei-Lisa/kwdb) from Sei-Lisa for the definition of functions, constants, and events. When new LSL functions are released, you can simply download or edit the XML file yourself without waiting for a plugin update!
 * **Code Formatting & Clean Up:** Automatically format your code, fix indentation, and keep your scripts clean and readable.
@@ -40,7 +41,8 @@ Write LSL (Linden Script Language) directly inside IntelliJ IDEA, PyCharm, Andro
 * **`#elif`** — Alternative conditional branch (`else if`) within a block.
 * **`#else`** — Fallback branch when prior conditions fail.
 * **`#endif`** — Closes an active conditional block.
-* **`#include`** — Merges an external `.lslm` module (e.g., `#include "Vectors.lslm"`). The file must be in the same
+*
+    * **`#include`** — Merges an external `.lslm` module (e.g., `#include "Vectors.lslm"`). The file must be in the same
   folder or in a folder of the Project properties / Content roots.
 * **`#inline`** — Inlines the function written below directly in the code instead of calling it.
 ---

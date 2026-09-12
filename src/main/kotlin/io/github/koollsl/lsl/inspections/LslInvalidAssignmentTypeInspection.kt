@@ -39,7 +39,7 @@ class LslInvalidAssignmentTypeInspection : LocalInspectionTool() {
                 if (isConstant) {
                     holder.registerProblem(
                         lValue ?: expression,
-                        "Cannot assign to a constant",
+                        "Cannot assign to a constant '${identifierText}'",
                         ProblemHighlightType.GENERIC_ERROR
                     )
                     return

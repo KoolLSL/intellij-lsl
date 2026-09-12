@@ -1,3 +1,5 @@
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 import java.util.zip.ZipFile
 
 plugins {
@@ -11,9 +13,9 @@ plugins {
 layout.buildDirectory.set(File("C:/IntelliJBuild/${project.name}"))
 
 group = "kool"
-version = "0.2.4"
-
 sourceSets["main"].java.srcDirs("src/main/gen")
+// Automatic plugin's Version (CalVer: YYYY.MM.DD.HHmm)
+version = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy.MM.dd.HHmm"))
 
 repositories {
     mavenCentral()
