@@ -383,31 +383,23 @@ class LslPreprocessorEngine(private val project: Project) {
         )
     }
 
-    fun isElementDisabled(element: PsiElement?): Boolean {
-
-        if (element == null) return false
-        val file = runCatching { element.containingFile }.getOrNull() ?: return false
-        if (element is PsiFile) return false
-        val elementRange = runCatching { element.textRange }.getOrNull() ?: return false
+    fun isElementDisabled(element: PsiElement): Boolean {
+        val file = element.containingFile ?: return false
         val disabledRanges = getDisabledRanges(file)
         if (disabledRanges.isEmpty()) return false
 
         return try {
-            if (elementRange.isEmpty) {
-                disabledRanges.any { it.containsOffset(element.textOffset) }
-            } else {
-                disabledRanges.any { it.contains(elementRange) || it.intersects(elementRange) }
-            }
+            disabledRanges.any { it.containsOffset(element.textOffset) }
         } catch (_: Exception) {
             false
         }
     }
 
-    fun getDisabledRanges(file: PsiFile?): List<TextRange> {
-        if (file == null || !file.isValid) return emptyList()
+    fun getDisabledRanges(file: PsiFile): List<TextRange> {
+        if (!file.isValid) return emptyList()
 
         return CachedValuesManager.getCachedValue(file) {
-            val ranges = runCatching { computeDisabledRanges(file) }.getOrDefault(emptyList())
+            val ranges = computeDisabledRanges(file)
             CachedValueProvider.Result.create(ranges, file)
         }
     }
@@ -417,8 +409,8 @@ class LslPreprocessorEngine(private val project: Project) {
      * Checks if a specific TextRange is fully contained within any disabled preprocessor range in the file.
      * Efficiently uses the cached getDisabledRanges list.
      */
-    fun isDisabledText(file: PsiFile?, range: TextRange): Boolean {
-        if (file == null || range.isEmpty) return false
+    fun isDisabledText(file: PsiFile, range: TextRange): Boolean {
+        if (range.isEmpty) return false
         val disabledRanges = getDisabledRanges(file)
         if (disabledRanges.isEmpty()) return false
         return disabledRanges.any { disabled -> disabled.contains(range) }
@@ -744,13 +736,15 @@ class LslPreprocessorEngine(private val project: Project) {
 
             if (hasDirect) {
                 val declarations = section.items.filterIsInstance<PreprocessedItem.Declaration>()
-                val usedFuncs = declarations.count { it.isSurviving && it.psiElement is LslFunction }
-                val usedConsts = declarations.count { decl ->
+
+                val survivingVars = declarations.count { it.isSurviving && it.psiElement is LslGlobalVariable }
+                val survivingFuncs = declarations.count { it.isSurviving && it.psiElement is LslFunction }
+                val inlinedConsts = declarations.count { decl ->
                     val element = decl.psiElement
-                    element is LslGlobalVariable && (decl.isSurviving || element.name in usedConstantNames)
+                    element is LslGlobalVariable && !decl.isSurviving && element.name in usedConstantNames
                 }
 
-                sb.appendLine("// --- BEGIN INCLUDE: ${section.fileName} ($usedConsts constants, $usedFuncs functions used) ---")
+                sb.appendLine("// --- BEGIN INCLUDE: ${section.fileName} ($survivingVars variables, $survivingFuncs functions, $inlinedConsts constants) ---")
 
                 for (item in section.items) {
                     when (item) {

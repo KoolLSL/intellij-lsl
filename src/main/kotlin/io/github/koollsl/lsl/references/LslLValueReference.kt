@@ -5,7 +5,6 @@ import com.intellij.openapi.util.TextRange
 import com.intellij.psi.*
 import com.intellij.psi.impl.source.resolve.ResolveCache
 import io.github.koollsl.lsl.KwdbData
-import io.github.koollsl.lsl.preprocessor.LslIncludesCollector
 import io.github.koollsl.lsl.preprocessor.LslPreprocessorEngine
 import io.github.koollsl.lsl.psi.*
 
@@ -39,70 +38,100 @@ class LslLValueReference(val element: LslLValue) :
             return arrayOf(PsiElementResolveResult(element))
         }
 
-        val result = ArrayList<ResolveResult>()
+        val targetName = element.variableName ?: return ResolveResult.EMPTY_ARRAY
+        val result = ArrayList<ResolveResult>(2)
         var node: PsiElement? = element
 
         while (node != null) {
             when (node) {
-                // Check the variable is declared before usage, and is not in disabled code
-                is LslStatementBlock ->
-                    result.addAll(
-                        node.children
-                            .takeWhile { it.textOffset < element.textOffset }
-                            .filterIsInstance<LslStatementVariable>()
-                            .filter { it.name == element.variableName && !engine.isElementDisabled(it) }
-                            .let { ArrayList(it).asReversed() }
-                            .map { PsiElementResolveResult(it) }
-                    )
+                // 1. Local block scope: collect variables declared BEFORE this element in the same block
+                is LslStatementBlock -> {
+                    val elementOffset = element.textOffset
+                    var child = node.firstChild
+                    val localVars = ArrayList<LslStatementVariable>()
 
-                is LslEvent ->
-                    result.addAll(
-                        node.arguments
-                            .filter { it.name == element.variableName }
-                            .map { PsiElementResolveResult(it) }
-                    )
-
-                is LslFunction ->
-                    result.addAll(
-                        node.arguments
-                            .filter { it.name == element.variableName }
-                            .map { PsiElementResolveResult(it) }
-                    )
-
-                is LslFile -> {
-                    val project = element.project
-
-                    // 1. Local file globals
-                    val localGlobals = node.children
-                        .filterIsInstance<LslGlobalVariable>()
-                        .filter { it.name == element.variableName && !engine.isElementDisabled(it) }
-                        .let { ArrayList(it).asReversed() }
-                        .map { PsiElementResolveResult(it) }
-
-                    // 2. Included file globals
-                    val includedFiles = LslIncludesCollector.getInstance(project).getIncludedFiles(node)
-                    val includedGlobals = includedFiles.flatMap { file ->
-                        (file as? LslFile)?.children
-                            ?.filterIsInstance<LslGlobalVariable>()
-                            ?.filter { it.name == element.variableName }
-                            //?.filter { it.name == element.variableName&& !engine.isElementDisabled(it) }
-                            ?.map { PsiElementResolveResult(it) }
-                            ?: emptyList()
+                    while (child != null) {
+                        if (child.textOffset >= elementOffset) break
+                        if (child is LslStatementVariable && child.name == targetName && !engine.isElementDisabled(child)) {
+                            localVars.add(child)
+                        }
+                        child = child.nextSibling
                     }
 
-                    // 3. Built‑in constants
-                    val builtinConstants = listOfNotNull(
-                        KwdbData.getInstance(project).constants[element.variableName]
-                    ).map { PsiElementResolveResult(it) }
+                    // Traverse backwards for standard shadowing semantics
+                    for (i in localVars.size - 1 downTo 0) {
+                        result.add(PsiElementResolveResult(localVars[i]))
+                    }
+                }
 
-                    return (result + localGlobals + includedGlobals + builtinConstants)
-                        .toTypedArray()
+                // 2. Event parameter scope
+                is LslEvent -> {
+                    val args = node.arguments
+                    for (i in args.indices) {
+                        val arg = args[i]
+                        if (arg.name == targetName) {
+                            result.add(PsiElementResolveResult(arg))
+                        }
+                    }
+                }
+
+                // 3. Function parameter scope
+                is LslFunction -> {
+                    val args = node.arguments
+                    for (i in args.indices) {
+                        val arg = args[i]
+                        if (arg.name == targetName) {
+                            result.add(PsiElementResolveResult(arg))
+                        }
+                    }
+                }
+
+                // 4. File-level scope: uses the Cached Value symbol table
+                is LslFile -> {
+                    // Early exit if resolved locally higher up the PSI stack
+                    if (result.isNotEmpty()) {
+                        return result.toTypedArray()
+                    }
+
+                    val symbols = LslFileSymbolCache.getSymbols(node)
+
+                    // Local file globals (bottom-to-top preference)
+                    for (i in symbols.globalVariables.size - 1 downTo 0) {
+                        val globalVar = symbols.globalVariables[i]
+                        if (globalVar.name == targetName) {
+                            result.add(PsiElementResolveResult(globalVar))
+                        }
+                    }
+
+                    // Included file globals (evaluated if no local global match)
+                    if (result.isEmpty()) {
+                        outer@ for (incFile in symbols.includedFiles) {
+                            val incSymbols = LslFileSymbolCache.getSymbols(incFile)
+                            for (globalVar in incSymbols.globalVariables) {
+                                if (globalVar.name == targetName) {
+                                    result.add(PsiElementResolveResult(globalVar))
+                                    break@outer
+                                }
+                            }
+                        }
+                    }
+
+                    // Built-in constants (Zero-allocation lookup)
+                    if (result.isEmpty()) {
+                        val builtinConstant = KwdbData.getInstance(element.project).constants[targetName]
+                        if (builtinConstant != null) {
+                            result.add(PsiElementResolveResult(builtinConstant))
+                        }
+                    }
+
+                    return if (result.isEmpty()) ResolveResult.EMPTY_ARRAY else result.toTypedArray()
                 }
             }
 
+            // Move up to parent node in PSI hierarchy
             node = node.parent
         }
 
-        return result.toTypedArray()
+        return if (result.isEmpty()) ResolveResult.EMPTY_ARRAY else result.toTypedArray()
     }
 }

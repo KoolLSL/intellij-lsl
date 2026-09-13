@@ -5,11 +5,9 @@ import com.intellij.openapi.util.TextRange
 import com.intellij.psi.*
 import com.intellij.psi.impl.source.resolve.ResolveCache
 import io.github.koollsl.lsl.KwdbData
-import io.github.koollsl.lsl.preprocessor.LslIncludesCollector
 import io.github.koollsl.lsl.preprocessor.LslPreprocessorEngine
 import io.github.koollsl.lsl.psi.LslExpressionFunctionCall
 import io.github.koollsl.lsl.psi.LslFile
-import io.github.koollsl.lsl.psi.LslFunction
 
 class LslExpressionFunctionCallReference(val element: LslExpressionFunctionCall) :
     PsiReferenceBase<PsiElement>(element), PsiPolyVariantReference {
@@ -21,6 +19,7 @@ class LslExpressionFunctionCallReference(val element: LslExpressionFunctionCall)
         multiResolve(false).firstOrNull()?.element
 
     override fun multiResolve(incompleteCode: Boolean): Array<ResolveResult> {
+        // Early return for disabled elements to bypass resolve cache overhead
         if (engine.isElementDisabled(element)) {
             return arrayOf(PsiElementResolveResult(element))
         }
@@ -37,28 +36,26 @@ class LslExpressionFunctionCallReference(val element: LslExpressionFunctionCall)
         element.functionNameIdentifier?.textRangeInParent ?: TextRange.EMPTY_RANGE
 
     private fun resolveInner(): Array<ResolveResult> {
+        // Double-check disablement inside cached resolve execution
         if (engine.isElementDisabled(element)) {
             return arrayOf(PsiElementResolveResult(element))
         }
 
         val functionName = element.functionName ?: return emptyArray()
         val project = element.project
+        val containingFile = element.containingFile as? LslFile ?: return emptyArray()
 
-        // 1. Local functions
-        val localFunctions = element.containingFile.children
-            .filterIsInstance<LslFunction>()
+        // 1. Local functions (from cached file symbols)
+        val localFunctions = LslFileSymbolCache.getSymbols(containingFile)
+            .functions
             .filter { it.name == functionName }
-        //.filter { it.name == functionName && !engine.isElementDisabled(it)}
 
         // 2. Included files
-        val includedFiles =
-            LslIncludesCollector.getInstance(project).getIncludedFiles(element.containingFile as LslFile)
+        val includedFiles = LslFileSymbolCache.getSymbols(containingFile).includedFiles
         val includedFunctions = includedFiles.flatMap { file ->
-            (file as? LslFile)?.children
-                ?.filterIsInstance<LslFunction>()
-                ?.filter { it.name == functionName }
-            //?.filter { it.name == functionName && !engine.isElementDisabled(it)}
-                ?: emptyList()
+            LslFileSymbolCache.getSymbols(file)
+                .functions
+                .filter { it.name == functionName }
         }
 
         // 3. Built‑in functions
