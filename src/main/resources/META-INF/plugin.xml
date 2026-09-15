@@ -1,6 +1,6 @@
 <idea-plugin>
     <id>io.github.koollsl.intellij-lsl</id>
-    <name>LSL (Linden Scripting Language)</name>
+    <name>LSL (Linden Scripting Language) - Kool</name>
     <version>GENERATED-BY_build.gradle.kts</version>
 
     <vendor url="https://github.com/KoolLSL/intellij-lsl">KoolLSL</vendor>
@@ -26,18 +26,17 @@
     <extensions defaultExtensionNs="com.intellij">
         <!-- Project Services -->
         <projectService serviceImplementation="io.github.koollsl.lsl.preprocessor.LslPreprocessorEngine"/>
-        <!-- Provider for calculating the hints in editor -->
+
+        <!-- Code Vision Providers -->
         <codeInsight.daemonBoundCodeVisionProvider
                 implementation="io.github.koollsl.lsl.references.LslFunctionUsageCodeVisionProvider"/>
-
-        <!-- Provider for the Settings UI label (CRITICAL: extension point name must match EP.EXTENSION_POINT_NAME) -->
         <config.codeVisionGroupSettingProvider
                 implementation="io.github.koollsl.lsl.references.LslCodeVisionGroupSettingProvider"/>
 
         <!-- Language Definitions & Syntax -->
         <fileType
                 name="LSL file"
-                implementationClass="io.github.koollsl.lsl.LslFileType"
+                implementationClass="LslFileType"
                 fieldName="INSTANCE"
                 language="LSL"
                 extensions="lslp;lslm;lsl"/>
@@ -73,7 +72,7 @@
                 implementationClass="io.github.koollsl.lsl.completion.LslCompletionContributor"/>
 
         <langCodeStyleSettingsProvider
-                implementation="io.github.koollsl.lsl.formatting.LslLanguageCodeStyleSettingsProvider" />
+                implementation="io.github.koollsl.lsl.formatting.LslLanguageCodeStyleSettingsProvider"/>
 
         <lang.foldingBuilder
                 language="LSL"
@@ -109,26 +108,22 @@
         <colorSettingsPage
                 implementation="io.github.koollsl.lsl.syntax.LslColorSettingsPage"/>
         <iconProvider
-                implementation="io.github.koollsl.lsl.LslIconProvider"/>
+                implementation="LslIconProvider"/>
 
         <projectViewNodeDecorator
                 implementation="io.github.koollsl.lsl.psi.LslProjectViewNodeDecorator"/>
 
         <postStartupActivity implementation="io.github.koollsl.lsl.psi.LslStartupActivity"/>
 
-        <codeInsight.daemonBoundCodeVisionProvider
-                implementation="io.github.koollsl.lsl.references.LslFunctionUsageCodeVisionProvider"/>
-
         <applicationConfigurable
                 parentId="language"
                 instance="io.github.koollsl.lsl.settings.LslSettingsConfigurable"
-                id="io.github.koollsl.lsl.settings.LslSettingsConfigurable"
+                id="settings.LslSettingsConfigurable"
                 displayName="LSL"/>
 
-        <internalFileTemplate
-                name="Linden Script"/>
+        <internalFileTemplate name="Linden Script"/>
 
-        <!-- inspections -->
+        <!-- Inspections -->
         <localInspection
                 language="LSL"
                 groupName="LSL"
@@ -215,7 +210,7 @@
                 displayName="Invalid vector or quaternion item"
                 enabledByDefault="true"
                 implementationClass="io.github.koollsl.lsl.inspections.LslInvalidVectorOrQuaternionItemInspection"/>
-         <localInspection
+        <localInspection
                 language="LSL"
                 groupName="LSL"
                 shortName="LslEmptyStateBody"
@@ -275,7 +270,7 @@
                 implementationClass="io.github.koollsl.lsl.inspections.LslInvalidEventDeclarationInspection"/>
         <localInspection
                 language="LSL"
-                groupPath="LSL"
+                groupName="LSL"
                 shortName="LslUnmatchedDirective"
                 displayName="Unmatched or unclosed #directive"
                 enabledByDefault="true"
@@ -303,18 +298,17 @@
                 icon="AllIcons.Actions.Preview">
         </action>
 
-        <!-- Add both to the top of the Tab Right-Click Menu -->
+        <!-- Tab Right-Click Menu -->
         <group id="Lsl.ProcessedFileGroup"
                 text="LSL Preprocessor"
                 popup="false">
-            <!-- Changed anchor to "first" to place at the top -->
             <add-to-group group-id="EditorTabPopupMenu"
                     anchor="first"/>
             <add-to-group group-id="ProjectViewPopupMenu"
                     anchor="first"/>
 
             <reference ref="Lsl.OpenProcessedFile"/>
-            <separator/> <!-- Separator keeps your items visually distinct from standard IDE options -->
+            <separator/>
         </group>
     </actions>
 </idea-plugin>

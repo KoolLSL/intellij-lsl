@@ -2,7 +2,7 @@ package io.github.koollsl.lsl.inspections
 
 import com.intellij.codeInspection.InspectionManager
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
-import io.github.koollsl.lsl.LslPrimitiveType
+import LslPrimitiveType
 import io.github.koollsl.lsl.parser.LslTypes
 
 class LslTypeCompatibilityTest : BasePlatformTestCase() {
