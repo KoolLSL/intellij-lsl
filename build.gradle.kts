@@ -107,6 +107,16 @@ tasks {
 
 }
 
+tasks.named<org.jetbrains.intellij.tasks.BuildPluginTask>("buildPlugin") {
+    doLast {
+        val zipFile = outputs.files.singleFile
+        println("\n" + "=".repeat(60))
+        println("📦 PLUGIN ZIP CREATED SUCCESSFULLY:")
+        println("   ${zipFile.absolutePath}")
+        println("\n")
+    }
+}
+
 // Install plugin + restart IntelliJ
 // Detect newest IntelliJ installation under %APPDATA%\JetBrains
 fun detectIntelliJPluginsDir(): File {
@@ -123,6 +133,10 @@ fun detectIntelliJPluginsDir(): File {
 }
 
 tasks.register("installPluginToIDE") {
+
+    group = "intellij" // Moves it into the main 'intellij' folder in the Gradle tool window
+    description = "Builds, unzips, installs the plugin to local IDE, and restarts IntelliJ."
+
     dependsOn("buildPlugin")
 
     doLast {

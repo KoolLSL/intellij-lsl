@@ -14,23 +14,40 @@ Write LSL (Linden Script Language) directly inside IntelliJ IDEA, PyCharm, Andro
 * **Code Formatting & Clean Up:** Automatically format your code, fix indentation, and keep your scripts clean and readable.
 * **Smart Scripting Tools:** Instant syntax highlighting, real-time error checking, smart auto-completion, and safe variable/function refactoring.
 
+---
 ### How to Install
 
-1. Open your JetBrains IDE (IntelliJ IDEA, PyCharm, Android Studio, etc.).
-2. Go to **Settings** → **Plugins**.
-3. ~~Search for `Linden Script (LSL)` under the **Marketplace** tab~~, or click the **⚙️ icon** → **Install Plugin from Disk...** to use a downloaded `.zip` from [GitHub Releases](https://github.com/KoolLSL/lsl/releases).
+1. Open your JetBrains IDE such as [IntelliJ IDEA](https://www.jetbrains.com/idea/), PyCharm, Android Studio, or any
+   other compatible IDE.
+2. Go to **Settings** → **Plugins** (or **Preferences** → **Plugins** on macOS).
+3. ~~Search for `Linden Script (LSL)` under the **Marketplace** tab~~, or click the **⚙️ icon** → **Install Plugin from
+   Disk...** to use a downloaded `intellij-lsl.zip`
+   from [GitHub Releases](https://github.com/KoolLSL/intellij-lsl/releases).
 4. Click **Install** and restart your IDE if prompted.
 
-### Quick Start
+### How to Use
 
 1. **Create a Project:** Open your IDE, go to **File → New → Project...**, select **Linden Script (LSL)**, and click **Create**.
-2. **Add Your Source Files:**
-    * **`.lslp` (Preprocessed File):** Create your main script here (e.g. `MyScript.lslp`). It can use directives.
-    * **`.lslm` (Module File):** Optional. Shared library files containing functions or constants to reuse across scripts (e.g. via `#include "MyLib.lslm"` inside `MyScript.lslp`).
-3. **Build:** Save your `.lslp` file (`Ctrl+S`). The plugin automatically generates an optimized, read-only **`.lsl`** script in the `/build` folder (e.g. `/build/MyScript.lsl`).
+2. **Add Your Source File:**
+    * **`.lslp` (Preprocessed File):** Create your main script file here (e.g., `MyScript.lslp`).
+3. **Build:** Save your `.lslp` file (`Ctrl+S`). The plugin automatically generates an optimized, read-only **`.lsl`**
+   script in the `/build` folder (e.g., `/build/MyScript.lsl`).
+    * *Tip:* Right-click the `.lslp` editor tab and select **Open Generated .lsl** to quickly view the generated output
+      in a new tab.
+4. **Import into Second Life:** If you use the **Firestorm Viewer**, enable its LSL preprocessor to link directly to the
+   generated `.lsl` file on your local disk when compiling in-world (e.g., using
+   `#include "MyProject/build/MyScript.lsl"`). Alternatively, copy and paste the generated `.lsl` contents into your
+   in-world script editor.
 
-4. **Import into Second Life:** If you have the **Firestorm Viewer**, enable its LSL preprocessor to automatically get the generated `.lsl` from your local disk when you recompile in-world (e.g. in your in-world script, write only `#include "MyProject/build/MyScript.lsl"`). Alternatively, you can copy and paste the generated `.lsl` text into your viewer script editor.
+---
 
+### Modules (Optional)
+
+You can split your codebase into reusable files or use preprocessor directives as your project grows:
+
+* **Module Files (`.lslm`):** Create helper files to store shared functions or constants (e.g., `MyLib.lslm`).
+* **Including Modules:** Import your created `.lslm` files into any `.lslp` script using standard preprocessor syntax:
+  (e.g. `#include MyLib.lslm`)
 ### Directives
 
 * **`#define`** — Defines a constant or macro (e.g., `#define VERSION 3`).
@@ -41,8 +58,7 @@ Write LSL (Linden Script Language) directly inside IntelliJ IDEA, PyCharm, Andro
 * **`#elif`** — Alternative conditional branch (`else if`) within a block.
 * **`#else`** — Fallback branch when prior conditions fail.
 * **`#endif`** — Closes an active conditional block.
-*
-    * **`#include`** — Merges an external `.lslm` module (e.g., `#include "Vectors.lslm"`). The file must be in the same
+* **`#include`** — Merges an external `.lslm` module (e.g., `#include "Vectors.lslm"`). The file must be in the same
   folder or in a folder of the Project properties / Content roots.
 * **`#inline`** — Inlines the function written below directly in the code instead of calling it.
 ---
@@ -53,7 +69,8 @@ Write LSL (Linden Script Language) directly inside IntelliJ IDEA, PyCharm, Andro
 
 This project is a modernized fork of the original [riej/lsl](https://github.com/riej/lsl) plugin.
 
-Compared to the Eclipse/LSLForge, this plugin has no internal simulator or compiler, but offers preprocessing and syntax checking inside the more modern JetBrains IDEs. This also makes the plugin easier to install and maintain.
+Compared to the Eclipse/LSLForge, this plugin has no internal simulator, but offers preprocessing and syntax checking
+inside the more modern JetBrains IDEs. This also makes the plugin easier to install and maintain.
 
 See [official LSL documentation](https://wiki.secondlife.com/wiki/LSL_Portal).
 
