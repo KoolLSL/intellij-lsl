@@ -132,7 +132,7 @@ tasks.register("installPluginToIDE") {
 
         val idePluginsDir = detectIntelliJPluginsDir()
 
-        val pluginId = "lsl"
+        val pluginId = project.name
         val targetDir = File(idePluginsDir, pluginId)
 
         if (targetDir.exists()) {

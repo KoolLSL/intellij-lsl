@@ -686,6 +686,7 @@ class LslPreprocessorEngine(private val project: Project) {
         sb: StringBuilder,
         usedConstantNames: Set<String>
     ) {
+        // Returns true if the section directly contains any surviving declarations.
         fun hasDirectSurvivingDeclarations(sec: PreprocessedItem.IncludeSection): Boolean {
             return sec.items.any { item ->
                 when (item) {
@@ -695,28 +696,52 @@ class LslPreprocessorEngine(private val project: Project) {
             }
         }
 
+        // Recursively checks if the section or any of its nested includes contain surviving content.
         fun hasAnySurvivingContent(sec: PreprocessedItem.IncludeSection): Boolean {
             return sec.items.any { item ->
                 when (item) {
                     is PreprocessedItem.Declaration -> item.isSurviving
+                    // Recurse on included
                     is PreprocessedItem.IncludeSection -> hasAnySurvivingContent(item)
                     else -> false
                 }
             }
         }
 
+        // Formats a summary string counting surviving variables, functions, and inlined constants.
+        fun getSectionStatsText(sec: PreprocessedItem.IncludeSection): String {
+            val declarations = sec.items.filterIsInstance<PreprocessedItem.Declaration>()
+            val vars = declarations.count { it.isSurviving && it.psiElement is LslGlobalVariable }
+            val funcs = declarations.count { it.isSurviving && it.psiElement is LslFunction }
+            val consts = declarations.count { d ->
+                val elem = d.psiElement
+                elem is LslGlobalVariable && !d.isSurviving && elem.name in usedConstantNames
+            }
+            return "$vars variables, $funcs functions, $consts constants"
+        }
+
+        // Replace tabs and non-breaking spaces characters with standard ASCII spaces
+        fun StringBuilder.appendCleanLine(text: String = ""): StringBuilder {
+            val cleanText = text
+                .replace("\t", "    ")   // Fixes Second Life viewer crossed-box icon
+                .replace('\u00A0', ' ')  // Non-breaking space (from web copy-paste)
+                .replace('\u202F', ' ')  // Narrow non-breaking space (from web copy-paste)
+            return this.appendLine(cleanText)
+        }
+
         if (isRoot) {
+            // Append main source
             for (item in section.items) {
                 when (item) {
                     is PreprocessedItem.FloatingComment -> {
-                        sb.appendLine(item.text).appendLine()
+                        sb.appendCleanLine(item.text).appendLine()
                     }
                     is PreprocessedItem.Declaration -> {
                         if (item.isSurviving) {
                             for (doc in item.docComments) {
-                                sb.appendLine(doc)
+                                sb.appendCleanLine(doc)
                             }
-                            sb.appendLine(item.psiElement.text).appendLine()
+                            sb.appendCleanLine(item.psiElement.text).appendLine()
                         }
                     }
                     is PreprocessedItem.IncludeSection -> {
@@ -725,26 +750,18 @@ class LslPreprocessorEngine(private val project: Project) {
                 }
             }
         } else {
+            // Append include section
             val hasDirect = hasDirectSurvivingDeclarations(section)
             val hasAny = hasAnySurvivingContent(section)
+            val statsText = getSectionStatsText(section)
 
             if (!hasAny) {
-                val totalCount = section.items.filterIsInstance<PreprocessedItem.Declaration>().size
-                sb.appendLine("// --- Consumed Include: ${section.fileName} ($totalCount items) ---").appendLine()
+                sb.appendCleanLine("// --- CONSUMED INCLUDE: ${section.fileName} ($statsText) ---").appendLine()
                 return
             }
 
             if (hasDirect) {
-                val declarations = section.items.filterIsInstance<PreprocessedItem.Declaration>()
-
-                val survivingVars = declarations.count { it.isSurviving && it.psiElement is LslGlobalVariable }
-                val survivingFuncs = declarations.count { it.isSurviving && it.psiElement is LslFunction }
-                val inlinedConsts = declarations.count { decl ->
-                    val element = decl.psiElement
-                    element is LslGlobalVariable && !decl.isSurviving && element.name in usedConstantNames
-                }
-
-                sb.appendLine("// --- BEGIN INCLUDE: ${section.fileName} ($survivingVars variables, $survivingFuncs functions, $inlinedConsts constants) ---")
+                sb.appendCleanLine("// --- BEGIN INCLUDE: ${section.fileName} ($statsText) ---")
 
                 for (item in section.items) {
                     when (item) {
@@ -752,9 +769,9 @@ class LslPreprocessorEngine(private val project: Project) {
                         is PreprocessedItem.Declaration -> {
                             if (item.isSurviving) {
                                 for (doc in item.docComments) {
-                                    sb.appendLine(doc)
+                                    sb.appendCleanLine(doc)
                                 }
-                                sb.appendLine(item.psiElement.text).appendLine()
+                                sb.appendCleanLine(item.psiElement.text).appendLine()
                             }
                         }
                         is PreprocessedItem.IncludeSection -> {
@@ -764,8 +781,8 @@ class LslPreprocessorEngine(private val project: Project) {
                 }
                 val current = sb.toString().trimEnd()
                 sb.setLength(0)
-                sb.appendLine(current)
-                sb.appendLine("// --- END INCLUDE: ${section.fileName} ---").appendLine()
+                sb.appendCleanLine(current)
+                sb.appendCleanLine("// --- END INCLUDE: ${section.fileName} ---").appendLine()
             } else {
                 for (item in section.items) {
                     if (item is PreprocessedItem.IncludeSection) {
@@ -964,13 +981,30 @@ class LslPreprocessorEngine(private val project: Project) {
         sb.appendLine("// ---------------------------------------------------------------")
         sb.appendLine("//  Source file            : $mainFileName")
         sb.appendLine("//  Generation time        : $timestamp")
-        sb.appendLine("//  Constants optimization : ${if (isConstantsOptimized) "ON" else "OFF [debug]"} ")
         sb.appendLine("//  Project                : ${project.name}")
+
+        // List defines
+        if (processed.definitions.isNotEmpty()) {
+            val defines = processed.definitions.map { (key, value) ->
+                val formattedValue = if (!value.isNullOrBlank()) "=$value" else ""
+                "#define $key$formattedValue"
+            }
+
+            sb.appendLine("//  Active Definitions     : ${defines.first()}")
+            defines.drop(1).forEach { line ->
+                sb.appendLine("//                           $line")
+            }
+        }
+
+        sb.appendLine("//  Constants optimization : ${if (isConstantsOptimized) "ON" else "OFF [debug]"} ")
+
+        // List Content roots from project structure
         val rootsText = if (allRoots.isNotEmpty()) "\\${shortenPath(project, allRoots[0].path)}" else ""
         sb.appendLine("//  Content roots          : $rootsText")
         for (i in 1 until allRoots.size) {
             sb.appendLine("//                           \\${shortenPath(project, allRoots[i].path)}")
         }
+
         sb.appendLine("// ---------------------------------------------------------------")
         sb.appendLine("//  LSL plugin version     : ${getPluginZip()}")
         sb.appendLine("//  Keyword database       : $kwdbSourceInfo")

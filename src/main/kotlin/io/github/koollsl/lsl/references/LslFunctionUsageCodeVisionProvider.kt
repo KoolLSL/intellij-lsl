@@ -14,16 +14,14 @@ import com.intellij.openapi.roots.ProjectRootManager
 import com.intellij.openapi.util.TextRange
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiFile
-import com.intellij.psi.search.GlobalSearchScope
-import com.intellij.psi.search.LocalSearchScope
-import com.intellij.psi.search.PsiSearchHelper
-import com.intellij.psi.search.UsageSearchContext
+import com.intellij.psi.search.searches.ReferencesSearch
 import com.intellij.psi.util.PsiTreeUtil
-import io.github.koollsl.lsl.parser.LslTypes
 import io.github.koollsl.lsl.preprocessor.LslPreprocessorEngine
 import io.github.koollsl.lsl.psi.ASTWrapperLslNamedElement
+import io.github.koollsl.lsl.psi.LslFile
 import io.github.koollsl.lsl.psi.LslFunction
 import io.github.koollsl.lsl.psi.LslGlobalVariable
+import io.github.koollsl.lsl.references.LslReferenceUtils.getLslIncludeScope
 
 class LslCodeVisionGroupSettingProvider : CodeVisionGroupSettingProvider {
     override val groupId: String = "lsl.code.usages"
@@ -44,6 +42,10 @@ class LslFunctionUsageCodeVisionProvider : DaemonBoundCodeVisionProvider {
     )
 
     override fun computeForEditor(editor: Editor, file: PsiFile): List<Pair<TextRange, CodeVisionEntry>> {
+        // Upstream Guard: Exit immediately if the target file isn't an LSL file
+        if (file !is LslFile) {
+            return emptyList()
+        }
 
         val vFile = file.virtualFile ?: return emptyList()
         if (ProjectRootManager.getInstance(file.project).fileIndex.isExcluded(vFile)) {
@@ -61,64 +63,29 @@ class LslFunctionUsageCodeVisionProvider : DaemonBoundCodeVisionProvider {
 
         if (targets.isEmpty()) return emptyList()
 
-        // 1. Build a fast lookup map: Name -> List of target PSI declarations
-        // 1. Build a fast lookup map: Name -> List of target PSI declarations
-        val targetMap: Map<String, List<ASTWrapperLslNamedElement>> = targets
-            .filter { !it.name.isNullOrEmpty() }
-            .groupBy { it.name!! }
-             
         val usageCounts = targets.associateWith { 0 }.toMutableMap()
 
-        val isModule = file.virtualFile?.extension?.equals("lslm", ignoreCase = true) == true
+        // 1. Single unified scope resolution (Module vs. Standard file)
+        val searchScope = getLslIncludeScope(file)
 
-        if (isModule) {
-            // For .lslm files across files, use fast word search without resolving references
-            val searchScope = getLslSearchScope(file)
-            for (target in targets) {
-                val name = target.name ?: continue
-                var count = 0
-                PsiSearchHelper.getInstance(file.project).processElementsWithWord(
-                    { element, _ ->
-                        if (element.node.elementType == LslTypes.IDENTIFIER && !engine.isElementDisabled(element)) {
-                            val parentNamed =
-                                PsiTreeUtil.getParentOfType(element, ASTWrapperLslNamedElement::class.java)
-                            if (parentNamed != target) {
-                                count++
-                            }
-                        }
-                        true
-                    },
-                    searchScope,
-                    name,
-                    UsageSearchContext.IN_CODE,
-                    true
-                )
-                usageCounts[target] = count
-            }
-        } else {
-            // 2. High-speed single pass for standard files: Count matching leaf tokens directly
-            PsiTreeUtil.processElements(file) { element ->
-                if (element.node.elementType == LslTypes.IDENTIFIER) {
-                    // Skip tokens inside disabled preprocessor ranges
-                    if (engine.isElementDisabled(element)) {
-                        return@processElements true
-                    }
+        // 2. Single unified search loop for counting usages
+        for (target in targets) {
+            val name = target.name
+            if (name.isNullOrEmpty()) continue
 
-                    val text = element.text
-                    val matchingTargets = targetMap[text]
-                    if (matchingTargets != null) {
-                        val parentDeclaration =
-                            PsiTreeUtil.getParentOfType(element, ASTWrapperLslNamedElement::class.java)
-                        for (target in matchingTargets) {
-                            // Increment count if this leaf isn't the declaration's own identifier
-                            if (parentDeclaration != target) {
-                                usageCounts[target] = (usageCounts[target] ?: 0) + 1
-                            }
-                        }
-                    }
-                }
-                true
-            }
+            // ReferencesSearch uses LslLValueReference / LslExpressionFunctionCallReference under the hood,
+            // leveraging your ResolveCache and LslFileSymbolCache automatically.
+//            val count = ReferencesSearch.search(target, searchScope)
+//                .findAll()
+//                .count { reference ->
+//                    val element = reference.element
+//                    !engine.isElementDisabled(element)
+//                }
+            val count = ReferencesSearch.search(target, searchScope)
+                .filtering { reference -> !engine.isElementDisabled(reference.element) }
+                .findAll()
+                .size
+            usageCounts[target] = count
         }
 
         // 3. Render Code Vision entries
@@ -139,43 +106,6 @@ class LslFunctionUsageCodeVisionProvider : DaemonBoundCodeVisionProvider {
         }
 
         return visionEntries
-    }
-
-    private fun getLslSearchScope(file: PsiFile): LocalSearchScope {
-        val virtualFile = file.virtualFile ?: return LocalSearchScope(file)
-        val project = file.project
-        val fileName = virtualFile.name
-
-        val matchingPsiFiles = mutableListOf<PsiFile>()
-        matchingPsiFiles.add(file)
-
-        val searchContext = (UsageSearchContext.IN_PLAIN_TEXT.toInt() or UsageSearchContext.IN_CODE.toInt()).toShort()
-        val fileIndex = ProjectRootManager.getInstance(project).fileIndex
-
-        PsiSearchHelper.getInstance(project).processElementsWithWord(
-            { element, _ ->
-                val containingFile = element.containingFile
-                val targetVFile = containingFile?.virtualFile
-
-                if (containingFile != null &&
-                    targetVFile != null &&
-                    !fileIndex.isExcluded(targetVFile) &&
-                    containingFile !in matchingPsiFiles
-                ) {
-                    matchingPsiFiles.add(containingFile)
-                }
-                true
-            },
-            GlobalSearchScope.getScopeRestrictedByFileTypes(
-                GlobalSearchScope.projectScope(project),
-                file.fileType
-            ),
-            fileName,
-            searchContext,
-            true
-        )
-
-        return LocalSearchScope(matchingPsiFiles.toTypedArray())
     }
 
     override fun handleClick(editor: Editor, textRange: TextRange, entry: CodeVisionEntry) {

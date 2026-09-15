@@ -15,6 +15,7 @@ import com.intellij.psi.util.parents
 import io.github.koollsl.lsl.LslLanguage
 import io.github.koollsl.lsl.preprocessor.LslPreprocessorEngine
 import io.github.koollsl.lsl.psi.*
+import io.github.koollsl.lsl.references.LslReferenceUtils.getLslIncludeScope
 
 class LslUnusedVariableInspection : LocalInspectionTool() {
     override fun getDisplayName(): String = "Unused variable"
@@ -30,13 +31,13 @@ class LslUnusedVariableInspection : LocalInspectionTool() {
         return object : LslElementVisitor() {
             override fun visitGlobalVariable(variable: LslGlobalVariable) {
                 // 2. Preprocessor check FIRST before evaluating global variables
-                if (preprocessorEngine.isDisabledText(file, variable.textRange)) return
+                if (preprocessorEngine.isElementDisabled(variable)) return
                 checkUnusedVariable(variable)
             }
 
             override fun visitStatementVariable(variable: LslStatementVariable) {
                 // Preprocessor check FIRST before evaluating statement variables
-                if (preprocessorEngine.isDisabledText(file, variable.textRange)) return
+                if (preprocessorEngine.isElementDisabled(variable)) return
                 checkUnusedVariable(variable)
             }
 
@@ -46,7 +47,7 @@ class LslUnusedVariableInspection : LocalInspectionTool() {
 
                 // 4. Determine appropriate LocalSearchScope based on variable scope
                 val searchScope = when (variable) {
-                    is LslGlobalVariable -> LocalSearchScope(file)
+                    is LslGlobalVariable -> getLslIncludeScope(file)
                     is LslStatementVariable -> {
                         val parentScope = variable.parents(false)
                             .firstOrNull { it is LslFunction || it is LslEvent } ?: file
@@ -56,7 +57,11 @@ class LslUnusedVariableInspection : LocalInspectionTool() {
                 }
 
                 // 5. Flag if no references exist within the scope
-                if (ReferencesSearch.search(variable, searchScope).findFirst() == null) {
+                val hasUsages = ReferencesSearch.search(variable, searchScope)
+                    .filtering { reference -> !preprocessorEngine.isElementDisabled(reference.element) }
+                    .findFirst() != null
+
+                if (!hasUsages) {
                     val variableName = variable.name ?: variable.identifyingElement?.text ?: "variable"
 
                     holder.registerProblem(

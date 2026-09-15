@@ -9,12 +9,12 @@ import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiElementVisitor
 import com.intellij.psi.PsiFile
-import com.intellij.psi.search.LocalSearchScope
 import com.intellij.psi.search.searches.ReferencesSearch
 import io.github.koollsl.lsl.LslLanguage
 import io.github.koollsl.lsl.preprocessor.LslPreprocessorEngine
 import io.github.koollsl.lsl.psi.LslElementVisitor
 import io.github.koollsl.lsl.psi.LslFunction
+import io.github.koollsl.lsl.references.LslReferenceUtils.getLslIncludeScope
 
 class LslUnusedFunctionInspection : LocalInspectionTool() {
     override fun getDisplayName(): String = "Unused function"
@@ -33,14 +33,19 @@ class LslUnusedFunctionInspection : LocalInspectionTool() {
                 if (element !is LslFunction) return
                 if (element.textRange.isEmpty) return
 
-                // 3. Preprocessor check FIRST before evaluating functions
-                if (preprocessorEngine.isDisabledText(file, element.textRange)) return
+                // 3. Preprocessor check FIRST before evaluating function
+                if (preprocessorEngine.isElementDisabled(element)) return
 
-                // 4. Restrict search scope to the containing file since LSL user functions are file-local
-                val searchScope = LocalSearchScope(file)
+                // 4. Resolve include-aware scope (.lsl = local file, .lslm = project dependents)
+                val searchScope = getLslIncludeScope(file)
 
-                // 5. Flag if no references exist within the file scope
-                if (ReferencesSearch.search(element, searchScope).findFirst() == null) {
+                // 5. Short-circuit search for active references using .filtering
+                val hasUsages = ReferencesSearch.search(element, searchScope)
+                    .filtering { reference -> !preprocessorEngine.isElementDisabled(reference.element) }
+                    .findFirst() != null
+
+                // 6. Flag if no enabled references exist
+                if (!hasUsages) {
                     val functionName = element.name ?: element.identifyingElement?.text ?: "function"
                     holder.registerProblem(
                         element,

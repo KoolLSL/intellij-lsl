@@ -24,8 +24,6 @@ class LslPsiTreeChangeListener(private val project: Project) : PsiTreeChangeAdap
 
         // 2. Direct refresh on preprocessor edits: Force immediate full-file re-highlighting
         val changedElement = event.parent ?: event.child ?: return
-        val text = changedElement.text.trimStart()
-
         if (changedElement.text.firstOrNull { !it.isWhitespace() } == '#') {
             DaemonCodeAnalyzer.getInstance(project).restart(psiFile)
         }

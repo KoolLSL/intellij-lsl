@@ -1,9 +1,9 @@
 <idea-plugin>
-    <id>io.github.koollsl.lsl</id>
+    <id>io.github.koollsl.intellij-lsl</id>
     <name>LSL (Linden Scripting Language)</name>
     <version>GENERATED-BY_build.gradle.kts</version>
 
-    <vendor url="https://github.com/KoolLSL">KoolLSL</vendor>
+    <vendor url="https://github.com/KoolLSL/intellij-lsl">KoolLSL</vendor>
 
     <description><![CDATA[
       Linden Script (LSL) language plugin.<br />
@@ -15,7 +15,7 @@
       <br />
       <b>WARNING:</b> the plugin is in early access and may contain problems.
       <br />
-      Please report about issues on <a href="https://github.com/koollsl/lsl/issues">GitHub</a>
+      Please report issues on <a href="https://github.com/KoolLSL/intellij-lsl/issues">GitHub</a>
     ]]></description>
 
     <depends>com.intellij.modules.platform</depends>

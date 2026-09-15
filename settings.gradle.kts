@@ -1,1 +1,1 @@
-rootProject.name = "lsl"
+rootProject.name = "intellij-lsl"

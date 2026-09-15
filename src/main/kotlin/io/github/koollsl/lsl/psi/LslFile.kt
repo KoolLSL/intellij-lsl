@@ -19,4 +19,5 @@ class LslFile(viewProvider: FileViewProvider) : PsiFileBase(viewProvider, LslLan
     override fun getPresentableText(): String = name.takeUnless { it.isBlank() } ?: "(anonymous)"
 
     override fun getIcon(unused: Boolean): Icon = LslIcons.FILE
+
 }
