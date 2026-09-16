@@ -16,8 +16,6 @@ editors.
   without waiting for a plugin update!
 * **Code Formatting & Clean Up:** Automatically format your code, fix indentation, and keep your scripts clean and readable.
 * **Smart Scripting Tools:** Instant syntax highlighting, real-time error checking, smart auto-completion, and safe variable/function refactoring.
-* **Version Control & History:** Built-in Local History and native integration with Git/GitHub to safely track changes,
-  see differences, resolve merge conflicts, and restore past revisions of your LSL scripts.
 
 ---
 ### How to Install
