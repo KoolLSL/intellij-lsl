@@ -1,5 +1,4 @@
-[![Version](https://img.shields.io/jetbrains/plugin/v/21002)](https://plugins.jetbrains.com/plugin/21002-linden-script-lsl-)
-![GitHub](https://img.shields.io/github/license/koollsl/lsl)
+![GitHub](https://img.shields.io/github/license/koollsl/intellij-lsl)
 
 
 Write LSL (Linden Script Language) directly inside IntelliJ IDEA, PyCharm, Android Studio, and other JetBrains editors.
@@ -39,6 +38,8 @@ Write LSL (Linden Script Language) directly inside IntelliJ IDEA, PyCharm, Andro
    `#include "MyProject/build/MyScript.lsl"`). Alternatively, copy and paste the generated `.lsl` contents into your
    in-world script editor.
 
+   *Tip: Type **LSL** in your IDE **Settings** to quickly access and customize plugin options.*
+
 ---
 
 ### Modules (Optional)
@@ -47,7 +48,7 @@ You can split your codebase into reusable files or use preprocessor directives a
 
 * **Module Files (`.lslm`):** Create helper files to store shared functions or constants (e.g., `MyLib.lslm`).
 * **Including Modules:** Import your created `.lslm` files into any `.lslp` script using standard preprocessor syntax:
-  (e.g. `#include MyLib.lslm`)
+  (e.g., `#include "MyLib.lslm"`)
 ### Directives
 
 * **`#define`** — Defines a constant or macro (e.g., `#define VERSION 3`).
@@ -65,7 +66,8 @@ You can split your codebase into reusable files or use preprocessor directives a
 
 ### Issues & Feedback
 
-> This plugin is a personal side project and may not be 100% perfect. If you run into obvious issues, please report them on [GitHub Issues](https://github.com/KoolLSL/lsl/issues).
+> This plugin is a personal side project and may not be 100% perfect. If you run into obvious issues, please report them
+> on [GitHub Issues](https://github.com/KoolLSL/intellij-lsl/issues).
 
 This project is a modernized fork of the original [riej/lsl](https://github.com/riej/lsl) plugin.
 
