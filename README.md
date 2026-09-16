@@ -16,6 +16,8 @@ editors.
   without waiting for a plugin update!
 * **Code Formatting & Clean Up:** Automatically format your code, fix indentation, and keep your scripts clean and readable.
 * **Smart Scripting Tools:** Instant syntax highlighting, real-time error checking, smart auto-completion, and safe variable/function refactoring.
+* **Version Control & History:** Built-in Local History and native integration with Git/GitHub to safely track changes,
+  see differences, resolve merge conflicts, and restore past revisions of your LSL scripts.
 
 ---
 ### How to Install
@@ -52,7 +54,7 @@ You can split your codebase into reusable files or use preprocessor directives a
 
 * **Module Files (`.lslm`):** Create shared files to store functions or constants (e.g., `MyLib.lslm`).
 * **Including Modules:** Import your created `.lslm` files into any `.lslp` script using standard preprocessor syntax:
-  (e.g., `#include "MyLib.lslm"`)
+  (e.g., `#include "MyLib.lslm"`). *(External folders must be added as Content Roots in Project Structure).*
 ### Directives
 
 * **`#define`** — Defines a constant or macro (e.g., `#define MODEL "PRO"`).
@@ -68,6 +70,19 @@ You can split your codebase into reusable files or use preprocessor directives a
 * **`#inline`** — Inlines the function written below directly in the code instead of calling it.
 ---
 
+### Inspections & Errors
+
+![Errors.png](docs/assets/IntelliJ Errors.png)
+
+### Quick Documentation Popup
+
+![Wiki popup](docs/assets/IntelliJ Wiki popup.png)
+
+### Smart Refactor
+
+![Refactor](docs/assets/IntelliJ Refactor.png)
+
+---
 ### Issues & Feedback
 
 > This plugin is a personal side project and may not be 100% perfect. If you run into obvious issues, please report them
