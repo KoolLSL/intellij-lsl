@@ -1,7 +1,8 @@
+![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
 ![GitHub](https://img.shields.io/github/license/KoolLSL/intellij-lsl)
 
 Write Linden Scripting Language (LSL) directly inside IntelliJ IDEA, PyCharm, Android Studio, and other JetBrains
-editors.
+editors across Windows, macOS, and Linux.
 
 <img src="docs/assets/Intellij-plugin.png" alt="Plugin Screenshot" width="600"/>
 
