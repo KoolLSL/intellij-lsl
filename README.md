@@ -3,7 +3,7 @@
 Write Linden Scripting Language (LSL) directly inside IntelliJ IDEA, PyCharm, Android Studio, and other JetBrains
 editors.
 
-<img src="src/main/resources/Intellij plugin.png" alt="Plugin Screenshot" width="600"/>
+<img src="docs/assets/Intellij plugin.png" alt="Plugin Screenshot" width="600"/>
 
 ### Key Features
 
@@ -73,7 +73,8 @@ You can split your codebase into reusable files or use preprocessor directives a
 > This plugin is a personal side project and may not be 100% perfect. If you run into obvious issues, please report them
 > on [GitHub Issues](https://github.com/KoolLSL/intellij-lsl/issues).
 
-This project is a modernized fork of the original [riej/lsl](https://github.com/riej/lsl) plugin.
+This project is a modernized fork of the original [riej/lsl](https://github.com/riej/lsl) plugin. Compiled and tested on
+**IntelliJ IDEA 2026.2.1**, **Java 17**, and **Windows 11**.
 
 Compared to the Eclipse/LSLForge, this plugin has no internal simulator, but offers preprocessing and syntax checking
 inside the more modern JetBrains IDEs. This also makes the plugin easier to install and maintain.
