@@ -70,6 +70,10 @@ You can split your codebase into reusable files or use preprocessor directives a
 * **`#inline`** — Inlines the function written below directly in the code instead of calling it.
 ---
 
+### Auto-completion
+
+![Auto-completion.png](docs/assets/IntelliJ-Auto-completion.png)
+
 ### Inspections & Errors
 
 ![Errors.png](docs/assets/IntelliJ-Errors.png)
@@ -83,6 +87,15 @@ You can split your codebase into reusable files or use preprocessor directives a
 ![Refactor](docs/assets/IntelliJ-Refactor.png)
 
 ---
+
+### Building the plugin
+
+1. **Open Project:** Open the repository root folder in IntelliJ IDEA (2026.2.1+).
+2. **Test / Install:** In the Gradle tool window, run `Tasks -> intellij -> runIde` to launch a sandbox IDE, or
+   `installPluginToIDE` to test directly in your main editor.
+3. **Package:** Run `Tasks -> build -> buildPlugin` to generate the distribution `.zip` in `build/distributions/`.
+
+---
 ### Issues & Feedback
 
 > This plugin is a personal side project and may not be 100% perfect. If you run into obvious issues, please report them
@@ -91,11 +104,10 @@ You can split your codebase into reusable files or use preprocessor directives a
 This project is a modernized fork of the original [riej/lsl](https://github.com/riej/lsl) plugin. Compiled and tested on
 **IntelliJ IDEA 2026.2.1**, **Java 17**, and **Windows 11**.
 
-Compared to the Eclipse/LSLForge, this plugin has no internal simulator, but offers preprocessing and syntax checking
-inside the more modern JetBrains IDEs. This also makes the plugin easier to install and maintain.
+Compared to Eclipse/LSLForge, this plugin has no internal simulator but offers preprocessing and syntax checking inside
+the more modern JetBrains IDEs. This also makes the plugin easier to install and maintain.
 
 See [official LSL documentation](https://wiki.secondlife.com/wiki/LSL_Portal).
-
 
 <sub style="color: #6a737d;">
 Second Life® and SL™ are registered trademarks of Linden Research, Inc. This plugin is an independent third-party tool and is not affiliated with, sponsored by, or endorsed by Linden Research, Inc.
