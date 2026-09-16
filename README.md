@@ -3,7 +3,7 @@
 Write Linden Scripting Language (LSL) directly inside IntelliJ IDEA, PyCharm, Android Studio, and other JetBrains
 editors.
 
-<img src="docs/assets/Intellij plugin.png" alt="Plugin Screenshot" width="600"/>
+<img src="docs/assets/Intellij-plugin.png" alt="Plugin Screenshot" width="600"/>
 
 ### Key Features
 
@@ -72,15 +72,15 @@ You can split your codebase into reusable files or use preprocessor directives a
 
 ### Inspections & Errors
 
-![Errors.png](docs/assets/IntelliJ Errors.png)
+![Errors.png](docs/assets/IntelliJ-Errors.png)
 
 ### Quick Documentation Popup
 
-![Wiki popup](docs/assets/IntelliJ Wiki popup.png)
+![Wiki popup](docs/assets/IntelliJ-Wiki-popup.png)
 
 ### Smart Refactor
 
-![Refactor](docs/assets/IntelliJ Refactor.png)
+![Refactor](docs/assets/IntelliJ-Refactor.png)
 
 ---
 ### Issues & Feedback
