@@ -1,21 +1,28 @@
 <idea-plugin>
     <id>io.github.koollsl.intellij-lsl</id>
-    <name>LSL (Linden Scripting Language) - Kool</name>
+    <name>Linden Scripting Language (LSL)</name>
     <version>GENERATED-BY_build.gradle.kts</version>
 
     <vendor url="https://github.com/KoolLSL/intellij-lsl">KoolLSL</vendor>
 
     <description><![CDATA[
-      Linden Script (LSL) language plugin.<br />
-      See <a href="https://wiki.secondlife.com/wiki/LSL_Portal">official LSL documentation</a>.<br />
-      Uses <a href="https://github.com/Sei-Lisa/kwdb">kwdb</a> database.<br />
+      Language support plugin for <b>Linden Scripting Language (LSL)</b>.<br />
+      Features syntax highlighting, preprocessor directives (<code>#define</code>, <code>#if</code>), code formatting, and inspections.<br />
       <br />
-      Second Life (SL) and Second Life Eye-in-Hand Logo are registered trademarks of Linden Lab.<br />
-      The plugin is third-party and is not supported by Linden Lab.<br />
+      <b>Links & Resources:</b>
+      <ul>
+        <li>See <a href="https://wiki.secondlife.com/wiki/LSL_Portal">Official LSL Documentation</a></li>
+        <li>Uses the popular <a href="https://github.com/Sei-Lisa/kwdb">kwdb</a> database</li>
+        <li>Report issues on <a href="https://github.com/KoolLSL/intellij-lsl/issues">GitHub</a></li>
+      </ul>
       <br />
-      <b>WARNING:</b> the plugin is in early access and may contain problems.
-      <br />
-      Please report issues on <a href="https://github.com/KoolLSL/intellij-lsl/issues">GitHub</a>
+      <b>⚠️ Early Access Note:</b> This plugin is currently in early preview and under active development.
+      <br /><br />
+      <hr />
+      <small>
+        <b>Disclaimer:</b> Second Life® and SL™ are registered trademarks of Linden Research, Inc.
+        This plugin is an independent third-party tool and is not affiliated with, sponsored by, or endorsed by Linden Lab.
+      </small>
     ]]></description>
 
     <depends>com.intellij.modules.platform</depends>
@@ -121,7 +128,8 @@
                 id="settings.LslSettingsConfigurable"
                 displayName="LSL"/>
 
-        <internalFileTemplate name="Linden Script"/>
+        <internalFileTemplate name="LSL Source Script"/>
+        <internalFileTemplate name="LSL Module Script"/>
 
         <!-- Inspections -->
         <localInspection
@@ -279,15 +287,22 @@
     </extensions>
 
     <actions>
-        <action
-                id="LSL.NewLindenScriptFile"
-                class="io.github.koollsl.lsl.actions.LslCreateFileAction"
-                text="Linden Script File"
-                description="Create new Linden Script file">
-            <add-to-group
-                    group-id="NewGroup"
+        <action id="io.github.koollsl.lsl.actions.LslCreateSourceFileAction"
+                class="io.github.koollsl.lsl.actions.LslCreateSourceFileAction"
+                text="LSL Source Script"
+                description="Create a new LSL source file (.lslp)">
+            <add-to-group group-id="NewGroup"
                     anchor="before"
                     relative-to-action="NewFile"/>
+        </action>
+
+        <action id="io.github.koollsl.lsl.actions.LslCreateModuleFileAction"
+                class="io.github.koollsl.lsl.actions.LslCreateModuleFileAction"
+                text="LSL Module Script"
+                description="Create a new LSL module file (.lslm)">
+            <add-to-group group-id="NewGroup"
+                    anchor="after"
+                    relative-to-action="io.github.koollsl.lsl.actions.LslCreateSourceFileAction"/>
         </action>
 
         <!-- Action 1: Open in new/focused Tab -->

@@ -4,7 +4,6 @@ import LslIcons
 import com.intellij.ide.actions.CreateFileFromTemplateAction
 import com.intellij.ide.actions.CreateFileFromTemplateDialog
 import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
@@ -12,38 +11,75 @@ import com.intellij.psi.PsiDirectory
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiFile
 import com.intellij.psi.util.PsiTreeUtil
-import com.intellij.refactoring.suggested.endOffset
 import io.github.koollsl.lsl.psi.LslFile
 import io.github.koollsl.lsl.psi.LslStatementBlock
 
-class LslCreateFileAction : CreateFileFromTemplateAction("Linden Script file", "", LslIcons.FILE), DumbAware {
-    override fun buildDialog(project: Project, directory: PsiDirectory, builder: CreateFileFromTemplateDialog.Builder) {
-        builder.setTitle("Linden Script file")
-            .addKind("Linden Script file", LslIcons.FILE, "Linden Script")
-    }
-
-    override fun getActionName(directory: PsiDirectory?, newName: String, templateName: String?): String =
-        "Linden Script file"
+abstract class LslCreateFileActionBase(
+    title: String,
+    description: String,
+    icon: javax.swing.Icon
+) : CreateFileFromTemplateAction(title, description, icon), DumbAware {
 
     override fun postProcess(
         createdElement: PsiFile,
         templateName: String?,
         customProperties: MutableMap<String, String>?
     ) {
-        if (createdElement is LslFile) {
-            val editor = FileEditorManager.getInstance(createdElement.project).selectedTextEditor ?: return
-            val virtualFile = createdElement.containingFile.virtualFile ?: return
-            if (FileDocumentManager.getInstance().getDocument(virtualFile) == editor.document) {
-                ApplicationManager.getApplication().runWriteAction {
-                    PsiDocumentManager.getInstance(createdElement.project).commitDocument(editor.document)
+        super.postProcess(createdElement, templateName, customProperties)
 
-                    // TODO: add newline in new document and put caret on it
-                    val brace = PsiTreeUtil.findChildOfType(createdElement, LslStatementBlock::class.java)?.braceLeftEl
-                    if (brace != null) {
-                        editor.caretModel.moveToOffset(brace.endOffset)
-                    }
+        if (createdElement !is LslFile) return
+
+        val project = createdElement.project
+        val editor = FileEditorManager.getInstance(project).selectedTextEditor ?: return
+        val document = editor.document
+
+        // Wait for the document to be committed and rendered in the editor
+        ApplicationManager.getApplication().invokeLater {
+            if (editor.isDisposed) return@invokeLater
+
+            PsiDocumentManager.getInstance(project).doPostponedOperationsAndUnblockDocument(document)
+
+            val statementBlock = PsiTreeUtil.findChildOfType(createdElement, LslStatementBlock::class.java)
+            if (statementBlock != null) {
+                // For LSL Source Scripts (.lslp): place caret inside state_entry block
+                val brace = statementBlock.braceLeftEl
+                if (brace != null) {
+                    editor.caretModel.moveToOffset(brace.textRange.endOffset + 1)
                 }
+            } else {
+                // For LSL Module Scripts (.lslm): place caret at the end of the header comment
+                editor.caretModel.moveToOffset(document.textLength)
             }
         }
     }
+}
+
+// --- Action 1: Source Script (.lslp) ---
+class LslCreateSourceFileAction : LslCreateFileActionBase(
+    "LSL Source Script",
+    "Creates a new LSL source file (.lslp)",
+    LslIcons.FILE_LSLP
+) {
+    override fun buildDialog(project: Project, directory: PsiDirectory, builder: CreateFileFromTemplateDialog.Builder) {
+        builder.setTitle("New LSL Source Script")
+            .addKind("LSL Source Script", LslIcons.FILE_LSLP, "LSL Source Script")
+    }
+
+    override fun getActionName(directory: PsiDirectory?, newName: String, templateName: String?): String =
+        "LSL Source Script"
+}
+
+// --- Action 2: Module Script (.lslm) ---
+class LslCreateModuleFileAction : LslCreateFileActionBase(
+    "LSL Module Script",
+    "Creates a new LSL module file (.lslm)",
+    LslIcons.FILE_LSLM
+) {
+    override fun buildDialog(project: Project, directory: PsiDirectory, builder: CreateFileFromTemplateDialog.Builder) {
+        builder.setTitle("New LSL Module Script")
+            .addKind("LSL Module Script", LslIcons.FILE_LSLM, "LSL Module Script")
+    }
+
+    override fun getActionName(directory: PsiDirectory?, newName: String, templateName: String?): String =
+        "LSL Module Script"
 }
