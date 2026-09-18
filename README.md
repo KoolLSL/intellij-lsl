@@ -34,8 +34,9 @@ editors across Windows, macOS, and Linux.
 
 ### How to Use
 
-1. **Create a Project:** Open your IDE, go to **File → New → Project...**, select **Linden Script (LSL)**, and click **Create**.
-2. **Add Your Source File:** **`.lslp` (Preprocessed File):** Create your main script file here (e.g., `MyScript.lslp`).
+1. **Create a Project:** Open your IDE, go to **File → New → Project...** and create an empty project, or use **File →
+   New → Project from existing sources...**.
+2. **Add Source File:** **File → New → LSL Source Script...**: Create your main script here (e.g., `MyScript.lslp`).
 3. **Build:** Save your `.lslp` file (`Ctrl+S`). The plugin automatically generates an optimized, read-only **`.lsl`**
    script in the `/build` folder (e.g., `/build/MyScript.lsl`).
     * *Tip:* Right-click the `.lslp` editor tab and select **Open Generated .lsl** to quickly view the generated output
@@ -51,9 +52,10 @@ editors across Windows, macOS, and Linux.
 
 ### Modules (Optional)
 
-You can split your codebase into reusable files or use preprocessor directives as your project grows:
+You can split your codebase into reusable files or use preprocessor directives as your project grows.
 
-* **Module Files (`.lslm`):** Create shared files to store functions or constants (e.g., `MyLib.lslm`).
+* **Module Files (`.lslm`):** Create shared files to store functions or constants with **File → New → LSL Module
+  Script...** (e.g., `MyLib.lslm`).
 * **Including Modules:** Import your created `.lslm` files into any `.lslp` script using standard preprocessor syntax:
   (e.g., `#include "MyLib.lslm"`). *(External folders must be added as Content Roots in Project Structure).*
 ### Directives
