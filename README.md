@@ -23,12 +23,12 @@ editors across Windows, macOS, and Linux.
 
 1. Open your JetBrains IDE such as [IntelliJ IDEA](https://www.jetbrains.com/idea/), PyCharm, Android Studio, or any
    other compatible IDE.
-2. Go to **Settings** → **Plugins** (or **Preferences** → **Plugins** on macOS).
-3. ~~3. Search for **Linden Scripting Language (LSL)** under the **Marketplace** tab~~, or click the **⚙️ icon** →
-   **Install Plugin from
-   Disk...** to use a downloaded `intellij-lsl.zip`
-   from [GitHub Releases](https://github.com/KoolLSL/intellij-lsl/releases).
-4. Click **Install** and restart your IDE if prompted.
+2. Choose your preferred installation method:
+    * **Marketplace (Direct):**
+    * [![Get Plugin on JetBrains Marketplace](https://img.shields.io/badge/Get%20Plugin-JetBrains%20Marketplace-000000?style=for-the-badge&logo=jetbrains)](https://plugins.jetbrains.com/plugin/34339)
+    * **Manual ZIP:**  
+      Go to **Settings** → **Plugins** , click the **⚙️ icon** → **Install Plugin from Disk...** to use a downloaded
+      `intellij-lsl.zip` from [GitHub Releases](https://github.com/KoolLSL/intellij-lsl/releases).
 
 ### How to Use
 
