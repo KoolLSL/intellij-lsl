@@ -1,3 +1,4 @@
+[![JetBrains Plugin Version](https://img.shields.io/jetbrains/plugin/v/34339.svg)](https://plugins.jetbrains.com/plugin/34339)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
 ![GitHub](https://img.shields.io/github/license/KoolLSL/intellij-lsl)
 
@@ -27,7 +28,8 @@ editors across Windows, macOS, and Linux.
     * **Marketplace (Direct):**
     * [![Get Plugin on JetBrains Marketplace](https://img.shields.io/badge/Get%20Plugin-JetBrains%20Marketplace-000000?style=for-the-badge&logo=jetbrains)](https://plugins.jetbrains.com/plugin/34339)
     * **Manual ZIP:**  
-      Go to **Settings** → **Plugins** , click the **⚙️ icon** → **Install Plugin from Disk...** to use a downloaded
+      Go to **Settings** → **Plugins** , click the **⚙️ icon** at top → **Install Plugin from Disk...** to use a
+      downloaded
       `intellij-lsl.zip` from [GitHub Releases](https://github.com/KoolLSL/intellij-lsl/releases).
 
 ### How to Use
