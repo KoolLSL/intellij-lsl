@@ -4,6 +4,7 @@ import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer
 import com.intellij.ide.projectView.ProjectView
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.Project
+import com.intellij.psi.PsiManager
 import com.intellij.psi.PsiTreeChangeAdapter
 import com.intellij.psi.PsiTreeChangeEvent
 
@@ -22,9 +23,14 @@ class LslPsiTreeChangeListener(private val project: Project) : PsiTreeChangeAdap
         ProjectView.getInstance(project).refresh()
         FileEditorManager.getInstance(project).updateFilePresentation(virtualFile)
 
-        // 2. Direct refresh on preprocessor edits: Force immediate full-file re-highlighting
+        // 2. Direct refresh on preprocessor directive edits: Force immediate full-file re-highlighting
         val changedElement = event.parent ?: event.child ?: return
         if (changedElement.text.firstOrNull { !it.isWhitespace() } == '#') {
+            // Invalidate resolution & preprocessor caches
+            PsiManager.getInstance(project).dropPsiCaches()
+
+            // Safe single-argument call compatible with your project SDK target
+            @Suppress("DEPRECATION")
             DaemonCodeAnalyzer.getInstance(project).restart(psiFile)
         }
     }

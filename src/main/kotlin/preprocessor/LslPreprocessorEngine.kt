@@ -2,10 +2,11 @@ package io.github.koollsl.lsl.preprocessor
 
 import KwdbData
 import LslPrimitiveType
-import com.intellij.ide.plugins.PluginManagerCore
+import com.intellij.ide.plugins.PluginManager
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.module.ModuleUtilCore
 import com.intellij.openapi.project.Project
@@ -935,7 +936,9 @@ class LslPreprocessorEngine(private val project: Project) {
         // 7. Emit output header & run section emitter
         val sb = StringBuilder()
 
-        val plugin = PluginManagerCore.getPluginDescriptorOrPlatformByClassName(LslGlobalVariable::class.java.name)
+        val pluginId =
+            PluginId.getId("io.github.koollsl.intellij-lsl") // Replace with your exact plugin ID from plugin.xml
+        val plugin = PluginManager.getInstance().findEnabledPlugin(pluginId)
         val pluginName = plugin?.name ?: "unknown"
         val fileName = plugin?.pluginPath?.fileName?.toString() ?: "unknown"
         val version = plugin?.version ?: "UNKNOWN"

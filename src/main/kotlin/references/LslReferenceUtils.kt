@@ -44,40 +44,41 @@ object LslReferenceUtils {
      * or an expanded scope containing all project files referencing the module for .lslm files.
      */
     fun getLslIncludeScope(file: PsiFile): LocalSearchScope {
-        val virtualFile = file.virtualFile ?: return LocalSearchScope(file)
+        // Safety check 1: Ensure the initial file itself has a valid containing file
+        val targetFile = file.containingFile ?: file
+        val virtualFile = targetFile.virtualFile ?: return LocalSearchScope(targetFile)
         val isModule = virtualFile.extension?.equals("lslm", ignoreCase = true) == true
 
         if (!isModule) {
-            return LocalSearchScope(file)
+            return LocalSearchScope(targetFile)
         }
 
-        val project = file.project
+        val project = targetFile.project
         val fileName = virtualFile.name
 
-        val matchingPsiFiles = mutableListOf<PsiFile>()
-        matchingPsiFiles.add(file)
+        val matchingPsiFiles = mutableSetOf<PsiFile>()
+        matchingPsiFiles.add(targetFile)
 
         val fileIndex = ProjectRootManager.getInstance(project).fileIndex
 
         // Restrict search scope to project content roots and target file types
         val projectContentScope = GlobalSearchScope.getScopeRestrictedByFileTypes(
             ProjectScope.getContentScope(project),
-            file.fileType
+            targetFile.fileType
         )
 
-        // UsageSearchContext.IN_COD: Strictly code references (#include "file.lslm")
+        // UsageSearchContext.IN_CODE: Strictly code references (#include "file.lslm")
         PsiSearchHelper.getInstance(project).processElementsWithWord(
             { element, _ ->
                 val containingFile = element.containingFile
-                val targetVFile = containingFile?.virtualFile
-
-                if (containingFile != null &&
-                    targetVFile != null &&
-                    fileIndex.isInContent(targetVFile) &&
-                    !fileIndex.isExcluded(targetVFile) &&
-                    containingFile !in matchingPsiFiles
-                ) {
-                    matchingPsiFiles.add(containingFile)
+                if (containingFile != null) {
+                    val targetVFile = containingFile.virtualFile
+                    if (targetVFile != null &&
+                        fileIndex.isInContent(targetVFile) &&
+                        !fileIndex.isExcluded(targetVFile)
+                    ) {
+                        matchingPsiFiles.add(containingFile)
+                    }
                 }
                 true
             },
@@ -87,6 +88,13 @@ object LslReferenceUtils {
             true
         )
 
-        return LocalSearchScope(matchingPsiFiles.toTypedArray())
+        // Safety check 2: Filter out any elements where containingFile is unexpectedly null
+        val validFiles = matchingPsiFiles.filter { it.containingFile != null }.toTypedArray()
+
+        if (validFiles.isEmpty()) {
+            return LocalSearchScope.EMPTY
+        }
+
+        return LocalSearchScope(validFiles)
     }
 }

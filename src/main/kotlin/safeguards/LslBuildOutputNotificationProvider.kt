@@ -2,14 +2,14 @@ package io.github.koollsl.lsl.safeguards
 
 import com.intellij.openapi.fileEditor.FileEditor
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.util.Key
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.EditorNotificationPanel
-import com.intellij.ui.EditorNotifications
+import com.intellij.ui.EditorNotificationProvider
+import java.util.function.Function
+import javax.swing.JComponent
 
-class LslBuildOutputNotificationProvider : EditorNotifications.Provider<EditorNotificationPanel>() {
+class LslBuildOutputNotificationProvider : EditorNotificationProvider {
     companion object {
-        private val KEY = Key.create<EditorNotificationPanel>("io.github.koollsl.lsl.safeguards.build.output")
         const val WARNING_TEXT = "This is a generated build file. Direct changes will be overwritten during preprocessing."
 
         fun isGeneratedBuildFile(file: VirtualFile?): Boolean {
@@ -19,9 +19,9 @@ class LslBuildOutputNotificationProvider : EditorNotifications.Provider<EditorNo
             val segments = dirPath.split('/')
             return segments.any { segment ->
                 segment.equals("build", ignoreCase = true) ||
-                segment.equals("out", ignoreCase = true) ||
-                segment.equals("output", ignoreCase = true) ||
-                segment.equals("dist", ignoreCase = true)
+                        segment.equals("out", ignoreCase = true) ||
+                        segment.equals("output", ignoreCase = true) ||
+                        segment.equals("dist", ignoreCase = true)
             }
         }
 
@@ -29,12 +29,16 @@ class LslBuildOutputNotificationProvider : EditorNotifications.Provider<EditorNo
         fun isGeneratedBuildLslFile(file: VirtualFile?): Boolean = isGeneratedBuildFile(file)
     }
 
-    override fun getKey(): Key<EditorNotificationPanel> = KEY
-
-    override fun createNotificationPanel(file: VirtualFile, fileEditor: FileEditor, project: Project): EditorNotificationPanel? {
+    override fun collectNotificationData(
+        project: Project,
+        file: VirtualFile
+    ): Function<in FileEditor, out JComponent?>? {
         if (!isGeneratedBuildFile(file)) return null
-        val panel = EditorNotificationPanel(fileEditor)
-        panel.text = WARNING_TEXT
-        return panel
+
+        return Function { fileEditor ->
+            EditorNotificationPanel(fileEditor, EditorNotificationPanel.Status.Warning).apply {
+                text = WARNING_TEXT
+            }
+        }
     }
 }

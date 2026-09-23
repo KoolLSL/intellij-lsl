@@ -42,7 +42,11 @@ sourceSets {
 
 tasks.generateGrammarSource {
     maxHeapSize = "64m"
-    arguments = arguments + listOf("-visitor", "-package", "io.github.koollsl.lsl.parser")
+    arguments = arguments + listOf(
+        "-visitor",
+        "-package", "io.github.koollsl.lsl.parser",
+        "-Xexact-output-dir"
+    )
     outputDirectory = file("src/main/gen")
 }
 
