@@ -1,7 +1,9 @@
 package io.github.koollsl.lsl.settings
 
+import KwdbData
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
 import com.intellij.openapi.options.Configurable
+import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.ui.DialogPanel
 import com.intellij.ui.dsl.builder.*
 import javax.swing.JComponent
@@ -14,6 +16,25 @@ class LslSettingsConfigurable : Configurable {
     override fun getDisplayName(): String = "LSL Settings"
 
     override fun createComponent(): JComponent {
+        // Retrieve the active project safely without changing constructor parameters
+        val activeProject = ProjectManager.getInstance().openProjects.firstOrNull()
+        var sourceInfo = "No active project"
+        var funcsCount = 0
+        var constsCount = 0
+        var eventsCount = 0
+
+        if (activeProject != null) {
+            try {
+                val kwdb = KwdbData.getInstance(activeProject)
+                sourceInfo = kwdb.kwdbSourceInfo.ifEmpty { "None" }
+                funcsCount = kwdb.functions.size
+                constsCount = kwdb.constants.size
+                eventsCount = kwdb.events.size
+            } catch (e: Throwable) {
+                sourceInfo = "Error: ${e.message ?: e.javaClass.simpleName}"
+            }
+        }
+
         val createdPanel = panel {
             row {
                 checkBox("Constant optimization")
@@ -28,17 +49,31 @@ class LslSettingsConfigurable : Configurable {
 
             separator()
 
+            // --- Keyword Database Status ---
+            row {
+                text("""<b>Keyword Database</b>""")
+
+            }
+            row("Source Loaded:") {
+                label(sourceInfo)
+            }
+            row("Parsed:") {
+                label("$funcsCount functions, $constsCount constants, $eventsCount events")
+            }
+
+
             row {
                 text("""
-                    To update the Keyword Database (LSL functions, events, and constants), edit or download a newer <code>kwdb.xml</code> file from <a href="https://github.com/Sei-Lisa/kwdb">github.com/Sei-Lisa/kwdb</a> and select it below.<br>
+                    To update the Keyword Database (LSL functions, events, and constants), download a newer <code>lsl_definitions.yaml</code> file from <a href="https://github.com/secondlife/lsl-definitions">github.com/secondlife/lsl-definitions</a> and select it below.<br>
                     <i>Leave blank to use the plugin's original definitions. Restart IDE after changing.</i>
                 """.trimIndent())
             }
 
-            row("Custom kwdb.xml:") {
-                val descriptor = FileChooserDescriptorFactory.createSingleFileDescriptor("xml")
-                    .withTitle("Select kwdb.xml file")
-                    .withDescription("Select kwdb.xml file")
+            row("Custom lsl_definitions.yaml:") {
+                val descriptor = FileChooserDescriptorFactory.createSingleFileDescriptor()
+                    .withExtensionFilter("yaml", "yml")
+                    .withTitle("Select lsl_definitions.yaml File")
+                    .withDescription("Select custom lsl_definitions.yaml definition file")
 
                 textFieldWithBrowseButton(
                     fileChooserDescriptor = descriptor

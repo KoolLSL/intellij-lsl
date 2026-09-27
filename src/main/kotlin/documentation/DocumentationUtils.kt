@@ -26,44 +26,32 @@ object DocumentationUtils {
      */
     fun commentsToDescription(element: PsiElement): String {
         val sb = StringBuilder()
-        var el: PsiElement? = element
+        var el: PsiElement? = element.prevSibling
 
-        if (element.nextSibling is PsiComment) {
-            el = element.nextSibling as PsiComment
+        // 1. Skip whitespace directly above the element
+        if (el is PsiWhiteSpace) {
+            if (el.text.split("\n").count() > 2) {
+                return ""
+            }
+            el = el.prevSibling
+        }
 
-            sb.append("<p>")
-
-            when (el.tokenType) {
-                LslTypes.LINE_COMMENT -> sb.append(el.text.trimStart('/'))
-                LslTypes.BLOCK_COMMENT -> sb.append(el.text.trim('/', '*'))
-                else -> sb.append(el.text)
+        // 2. Collect preceding comments
+        while (el is PsiComment) {
+            val commentText = when (el.tokenType) {
+                LslTypes.LINE_COMMENT -> el.text.trimStart('/')
+                LslTypes.BLOCK_COMMENT -> el.text.trim('/', '*')
+                else -> el.text
             }
 
-            sb.append("</p>")
-        } else {
-            while (el != null) {
-                el = el.prevSibling
+            sb.insert(0, "<p>$commentText</p>")
 
-                if (el is PsiWhiteSpace) {
-                    if (el.text.split("\n").count() > 2) {
-                        break
-                    }
-                    el = el.prevSibling
-                }
-
-                if (el is PsiComment) {
-                    sb.append("<p>")
-
-                    when (el.tokenType) {
-                        LslTypes.LINE_COMMENT -> sb.append(el.text.trimStart('/'))
-                        LslTypes.BLOCK_COMMENT -> sb.append(el.text.trim('/', '*'))
-                        else -> sb.append(el.text)
-                    }
-
-                    sb.append("</p>")
-                } else {
+            el = el.prevSibling
+            if (el is PsiWhiteSpace) {
+                if (el.text.split("\n").count() > 2) {
                     break
                 }
+                el = el.prevSibling
             }
         }
 

@@ -62,7 +62,8 @@ class LslEvent(node: ASTNode) : ASTWrapperLslNamedElement(node), NavigatablePsiE
 
         sb.append(DocumentationMarkup.DEFINITION_END)
 
-        val description = DocumentationUtils.commentsToDescription(eventDeclaration)
+        val description = KwdbData.getInstance(project).elementDocumentation[name]
+            ?: DocumentationUtils.commentsToDescription(this)
         if (description.isNotBlank()) {
             sb.append(DocumentationMarkup.CONTENT_START)
             sb.append(description)

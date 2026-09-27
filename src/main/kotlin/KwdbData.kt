@@ -1,29 +1,28 @@
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Key
 import com.intellij.openapi.vfs.LocalFileSystem
-import com.intellij.openapi.vfs.VfsUtil
-import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.PsiElement
-import com.intellij.psi.PsiManager
 import com.intellij.psi.util.PsiTreeUtil
-import com.intellij.psi.xml.XmlFile
-import com.intellij.psi.xml.XmlTag
-import com.intellij.xml.util.XmlUtil
 import io.github.koollsl.lsl.psi.*
 import io.github.koollsl.lsl.settings.LslSettings
+import org.yaml.snakeyaml.LoaderOptions
+import org.yaml.snakeyaml.Yaml
+import java.io.InputStream
 import java.nio.file.Path
 
 class KwdbData(val project: Project) {
-    val data: XmlFile
-    val lang = "en"
+    val data: Map<String, Any>
     val generated: LslFile
 
     var kwdbSourceInfo: String = ""
-        private set // Optional: keeps it read-only outside this class
+        private set
 
     val functions: Map<String, LslFunction>
     val constants: Map<String, LslGlobalVariable>
     val events: Map<String, LslEvent>
+
+    // Central lookup map for pre-formatted HTML documentation strings (tooltip)
+    val elementDocumentation = mutableMapOf<String, String>()
 
     companion object {
         val KWDB_DATA_KEY = Key.create<KwdbData>("KWDB_DATA")
@@ -36,23 +35,73 @@ class KwdbData(val project: Project) {
     }
 
     init {
-        val xmlVirtualFile: VirtualFile = findCustomOrResourceKwdb()
-        data = PsiManager.getInstance(project).findFile(xmlVirtualFile) as XmlFile
-        generated = LslElementFactory.createFile(project, generateSource())
+        val stream = obtainYamlStream()
+            ?: throw IllegalStateException("YAML stream could not be obtained.")
 
-        functions = generated.children.filterIsInstance<LslFunction>().associateBy { it.name!! }
-        constants = generated.children.filterIsInstance<LslGlobalVariable>().associateBy { it.name!! }
-        events = PsiTreeUtil.collectElementsOfType(generated, LslEvent::class.java).associateBy { it.name!! }
+        val mergedData = mutableMapOf<String, Any>()
+
+        stream.use { s ->
+            val loaderOptions = LoaderOptions().apply {
+                codePointLimit = 50 * 1024 * 1024
+            }
+            val yaml = Yaml(loaderOptions)
+
+            for (doc in yaml.loadAll(s)) {
+                if (doc is Map<*, *>) {
+                    mergeMaps(mergedData, doc)
+                }
+            }
+        }
+
+        data = mergedData
+
+        val source = generateSource()
+        generated = LslElementFactory.createFile(project, source)
+
+        functions = PsiTreeUtil.collectElementsOfType(generated, LslFunction::class.java)
+            .mapNotNull { fn -> fn.name?.let { it to fn } }
+            .toMap()
+
+        constants = PsiTreeUtil.collectElementsOfType(generated, LslGlobalVariable::class.java)
+            .mapNotNull { c -> c.name?.let { it to c } }
+            .toMap()
+
+        events = PsiTreeUtil.collectElementsOfType(generated, LslEvent::class.java)
+            .mapNotNull { ev -> ev.name?.let { it to ev } }
+            .toMap()
     }
 
+    fun getByName(name: String?): LslNamedElement? =
+        functions[name] ?: constants[name] ?: events[name]
 
-    private fun findCustomOrResourceKwdb(): VirtualFile {
+    fun hasElement(element: PsiElement): Boolean =
+        PsiTreeUtil.isAncestor(generated, element, true)
 
-        fun extractKwdbVersion(xmlFile: XmlFile): String {
-            val root = xmlFile.rootTag ?: return "unknown"
-            return root.getAttributeValue("version") ?: "unknown"
+    @Suppress("UNCHECKED_CAST")
+    private fun mergeMaps(target: MutableMap<String, Any>, source: Map<*, *>) {
+        source.forEach { (k, v) ->
+            val key = k.toString()
+            if (v != null) {
+                val existing = target[key]
+                if (existing is MutableMap<*, *> && v is Map<*, *>) {
+                    mergeMaps(existing as MutableMap<String, Any>, v)
+                } else if (v is Map<*, *>) {
+                    val newMap = mutableMapOf<String, Any>()
+                    mergeMaps(newMap, v)
+                    target[key] = newMap
+                } else {
+                    target[key] = v
+                }
+            }
         }
-        val customPathStr = LslSettings.instance.customKwdbPath
+    }
+
+    private fun obtainYamlStream(): InputStream? {
+        val customPathStr = try {
+            LslSettings.instance.customKwdbPath
+        } catch (e: Exception) {
+            ""
+        }
 
         if (customPathStr.isNotBlank()) {
             val customPath = Path.of(customPathStr)
@@ -60,106 +109,186 @@ class KwdbData(val project: Project) {
             if (customFile.exists()) {
                 val vFile = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(customFile)
                 if (vFile != null && vFile.isValid) {
-
-                    // Load PSI to extract version
-                    val xmlPsi = PsiManager.getInstance(project).findFile(vFile) as? XmlFile
-                    val version = xmlPsi?.let { extractKwdbVersion(it) } ?: "unknown"
-
-                    kwdbSourceInfo = "Custom (${customFile.name}, version $version)"
-                    return vFile
+                    kwdbSourceInfo = "Custom (${customFile.name})"
+                    return vFile.inputStream
                 }
             }
         }
 
-        // Integrated fallback
-        val resourceUrl = javaClass.classLoader.getResource("kwdb.xml")
-            ?: throw IllegalStateException("Bundled kwdb.xml missing from plugin JAR resources")
+        val stream = javaClass.classLoader.getResourceAsStream("lsl_definitions.yaml")
+            ?: javaClass.getResourceAsStream("/lsl_definitions.yaml")
+            ?: KwdbData::class.java.classLoader.getResourceAsStream("lsl_definitions.yaml")
 
-        val integratedVFile = VfsUtil.findFileByURL(resourceUrl)
-            ?: throw IllegalStateException("Could not resolve VirtualFile for bundled kwdb.xml")
+        if (stream != null) {
+            kwdbSourceInfo = "Integrated lsl_definitions.yaml"
+            return stream
+        }
 
-        val xmlPsi = PsiManager.getInstance(project).findFile(integratedVFile) as? XmlFile
-        val version = xmlPsi?.let { extractKwdbVersion(it) } ?: "unknown"
-
-        kwdbSourceInfo = "Integrated kwdb.xml ($version)"
-        return integratedVFile
+        kwdbSourceInfo = "Error: Resource lsl_definitions.yaml not found"
+        return null
     }
 
+    private fun cleanType(typeStr: String?): String = when (typeStr?.lowercase()?.trim()) {
+        "quaternion" -> "rotation"
+        "float", "integer", "string", "key", "vector", "rotation", "list" -> typeStr.lowercase().trim()
+        else -> "integer"
+    }
 
-    fun getByName(name: String?): LslNamedElement? =
-        functions[name] ?: constants[name]
-
-    fun hasElement(element: PsiElement): Boolean =
-        PsiTreeUtil.isAncestor(generated, element, true)
-
-
-    fun commentDescription(description: String): String =
-        description.trim().split('\n').filter { it != "<!-- TODO: add documentation -->" }
-            .joinToString("\n") { "// $it" }
-
-    fun isSLGrid(tag: XmlTag): Boolean = (tag.getAttributeValue("grid") ?: "sl").split(' ').contains("sl")
-
-    /**
-     * Generates LSL source code for KWDB file.
-     * All descriptions will be put as comments before declaration.
-     */
-    fun generateSource(): String {
+    private fun generateSource(): String {
+        elementDocumentation.clear()
         val sb = StringBuilder()
-        val subtags = data.rootTag?.subTags?.filter { isSLGrid(it) }
-        subtags?.forEach { tag ->
-            when (tag.name) {
-                "constant" -> let {
-                    tag.findSubTags("description").forEach { description ->
-                        sb.append("${commentDescription(description.value.text)}\n")
-                    }
 
-                    val type = tag.getAttributeValue("type")
-                    val value = when (type) {
-                        "string", "key" -> "\"${tag.getAttributeValue("value")?.replace(Regex("""\\x([0-9a-fA-F]{2})""")) { it.groupValues[1].toInt(16).toChar().toString() } ?: ""}\""
-                        "vector", "rotation", "quaternion" -> XmlUtil.unescape(tag.getAttributeValue("value") ?: "")
-                        else -> tag.getAttributeValue("value")
-                    }
+        fun formatParams(entry: Map<*, *>): String {
+            val rawArgs = entry["arguments"] ?: entry["params"] ?: entry["parameters"]
 
-                    sb.append("$type ${tag.getAttributeValue("name")} = $value;\n")
-                }
+            val paramList = mutableListOf<Pair<String, String>>()
 
-                "function" -> let {
-                    tag.findSubTags("description").forEach { description ->
-                        sb.append("${commentDescription(description.value.text)}\n")
-                    }
+            when (rawArgs) {
+                is List<*> -> {
+                    rawArgs.forEachIndexed { index, item ->
+                        if (item is Map<*, *>) {
+                            val firstKey = item.keys.firstOrNull()?.toString()
+                            val firstVal = item.values.firstOrNull()
 
-                    val type = tag.getAttributeValue("type")
-                    if (type != null) {
-                        sb.append("$type ")
-                    }
-                    sb.append("${tag.getAttributeValue("name")}(")
-                    tag.findSubTags("param").forEachIndexed { index, param ->
-                        if (index != 0) {
-                            sb.append(", ")
+                            if (firstVal is Map<*, *>) {
+                                val pName = firstKey ?: "arg$index"
+                                val pType = firstVal["type"]?.toString() ?: "string"
+                                paramList.add(Pair(pName, pType))
+                            } else {
+                                val pName = item["param"]?.toString()
+                                    ?: item["name"]?.toString()
+                                    ?: firstKey
+                                    ?: "arg$index"
+                                val pType = item["type"]?.toString()
+                                    ?: item["value-type"]?.toString()
+                                    ?: "string"
+                                paramList.add(Pair(pName, pType))
+                            }
+                        } else {
+                            paramList.add(Pair("arg$index", "string"))
                         }
-                        sb.append("${param.getAttributeValue("type")} ${param.getAttributeValue("name")}")
                     }
-                    sb.append(") {}\n")
                 }
+
+                is Map<*, *> -> {
+                    rawArgs.forEach { (key, valMap) ->
+                        val pName = key.toString()
+                        val pType = if (valMap is Map<*, *>) {
+                            valMap["type"]?.toString() ?: "string"
+                        } else {
+                            valMap?.toString() ?: "string"
+                        }
+                        paramList.add(Pair(pName, pType))
+                    }
+                }
+            }
+
+            return paramList.joinToString(", ") { (pName, pType) ->
+                val safeName = pName.replace("-", "_").replace(Regex("[^a-zA-Z0-9_]"), "")
+                val validName = if (safeName.isEmpty()) "arg" else safeName
+                "${cleanType(pType)} $validName"
             }
         }
 
-        sb.append("default {\n")
-        subtags?.filter { it.name == "event" }?.forEach { tag ->
-            tag.findSubTags("description").forEach { description ->
-                sb.append("    ${commentDescription(description.value.text)}\n")
+        fun formatParamDocs(entry: Map<*, *>): String {
+            val args = entry["arguments"] as? List<*> ?: return ""
+            val paramDocs = mutableListOf<String>()
+
+            args.forEach { arg ->
+                val argMap = arg as? Map<*, *> ?: return@forEach
+                argMap.forEach { (paramName, paramDetails) ->
+                    val details = paramDetails as? Map<*, *> ?: return@forEach
+
+                    val type = details["type"] as? String ?: ""
+                    val paramTooltip = details["tooltip"] as? String
+
+                    val tooltipStr = if (!paramTooltip.isNullOrBlank()) {
+                        val cleanTooltip = paramTooltip.replace("\r\n", " ")
+                            .replace("\n", " ")
+                            .replace(Regex("\\s+"), " ")
+                            .trim()
+                        " - $cleanTooltip"
+                    } else ""
+
+                    paramDocs.add("• $type <b>$paramName</b>$tooltipStr<br>")
+                }
             }
 
-            sb.append("    ${tag.getAttributeValue("name")} (")
-            tag.findSubTags("param").forEachIndexed { index, param ->
-                if (index != 0) {
-                    sb.append(", ")
-                }
-                sb.append("${param.getAttributeValue("type")} ${param.getAttributeValue("name")}")
-            }
-            sb.append(") {}\n")
+            if (paramDocs.isEmpty()) return ""
+            return "\n\n" + paramDocs.joinToString("\n")
         }
-        sb.append("}\n")
+
+        fun formatCommentBlock(
+            tooltip: String? = null,
+            extraInfo: String? = null,
+            paramDocs: String? = null
+        ): String {
+            val sections = listOfNotNull(
+                tooltip?.takeIf { it.isNotBlank() },
+                extraInfo?.takeIf { it.isNotBlank() },
+                paramDocs?.takeIf { it.isNotBlank() }
+            )
+
+            if (sections.isEmpty()) return ""
+
+            // Join sections with <p> or <br><br> to force line breaks in HTML hover popups
+            return sections.joinToString("<p>")
+        }
+
+        // Constants
+        (data["constants"] as? Map<*, *>)?.forEach { (name, rawEntry) ->
+            val entry = rawEntry as? Map<*, *> ?: return@forEach
+            val type = cleanType(entry["type"] as? String)
+            val rawValue = entry["value"]?.toString() ?: "0"
+
+            val tooltip = entry["tooltip"] as? String
+            val doc = formatCommentBlock(tooltip, null, "")
+            if (doc.isNotBlank()) {
+                elementDocumentation[name.toString()] = doc
+            }
+
+            val value = when (type) {
+                "string", "key" -> "\"${rawValue.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")}\""
+                else -> rawValue
+            }
+            sb.appendLine("$type $name = $value;")
+        }
+
+        // Functions
+        (data["functions"] as? Map<*, *>)?.forEach { (name, rawEntry) ->
+            val entry = rawEntry as? Map<*, *> ?: return@forEach
+
+            val tooltip = (entry["tooltip"] as? String).orEmpty()
+            val sleepVal = (entry["sleep"] as? Number)?.toDouble() ?: 0.0
+            val extraInfo = if (sleepVal > 0.0) "[Forced delay: ${sleepVal}s]" else null
+            val paramDocs = formatParamDocs(entry)
+            val doc = formatCommentBlock(tooltip, extraInfo, paramDocs)
+            if (doc.isNotBlank()) {
+                elementDocumentation[name.toString()] = doc
+            }
+
+            val rawType = entry["return"] as? String ?: entry["type"] as? String
+            val returnPrefix = if (!rawType.isNullOrBlank() && rawType != "void") "${cleanType(rawType)} " else ""
+            sb.appendLine("$returnPrefix$name(${formatParams(entry)}) {}")
+        }
+
+        // Events inside default block
+        sb.appendLine("default {")
+        sb.appendLine("    // --- LSL System Events ---\n")
+        (data["events"] as? Map<*, *>)?.forEach { (name, rawEntry) ->
+            val entry = rawEntry as? Map<*, *> ?: return@forEach
+
+            val tooltip = (entry["tooltip"] as? String).orEmpty()
+            val paramDocs = formatParamDocs(entry)
+            val doc = formatCommentBlock(tooltip, null, paramDocs)
+            if (doc.isNotBlank()) {
+                elementDocumentation[name.toString()] = doc
+            }
+
+            val paramsStr = formatParams(entry)
+            sb.appendLine("$name($paramsStr) {}")
+        }
+        sb.appendLine("}")
 
         return sb.toString()
     }
