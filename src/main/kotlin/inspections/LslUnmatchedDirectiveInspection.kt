@@ -45,6 +45,19 @@ class LslUnmatchedDirectiveInspection : LocalInspectionTool() {
                         is SourceDiagnostic.UnknownDirective ->
                             "Unknown directive '${diagnostic.directive}'. Supported: if, ifdef, ifndef, else, elif, endif, define, undef, inline, include"
 
+                        is SourceDiagnostic.IncludeFailed -> {
+                            val path = diagnostic.path
+                            val ext = path.substringAfterLast('.', "").lowercase()
+                            val hasExtension = path.contains('.') && ext != path
+
+                            if (hasExtension && ext != "lslm") {
+                                val baseName = path.substringBeforeLast('.')
+                                "Included files must have a '.lslm' extension ($baseName.lslm). You can also write '#include \"$baseName\"'."
+                            } else {
+                                "Cannot find include file '$path'"
+                            }
+                        }
+
                         else -> null
                     }
 

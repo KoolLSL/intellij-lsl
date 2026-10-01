@@ -24,9 +24,65 @@
     <!-- Register resource bundle for UI localizations -->
     <resource-bundle>messages.LslBundle</resource-bundle>
 
+    <actions>
+        <action id="io.github.koollsl.lsl.actions.LslCreateSourceFileAction"
+                class="io.github.koollsl.lsl.actions.LslCreateSourceFileAction"
+                text="LSL Source Script"
+                description="Create a new LSL source file (.lslp)">
+            <add-to-group group-id="NewGroup"
+                    anchor="before"
+                    relative-to-action="NewFile"/>
+        </action>
+
+        <action id="io.github.koollsl.lsl.actions.LslCreateModuleFileAction"
+                class="io.github.koollsl.lsl.actions.LslCreateModuleFileAction"
+                text="LSL Module Script"
+                description="Create a new LSL module file (.lslm)">
+            <add-to-group group-id="NewGroup"
+                    anchor="after"
+                    relative-to-action="io.github.koollsl.lsl.actions.LslCreateSourceFileAction"/>
+        </action>
+
+        <!-- Action 1: Open in new/focused Tab -->
+        <action id="Lsl.OpenProcessedFile"
+                class="io.github.koollsl.lsl.actions.OpenProcessedLslAction"
+                text="Open Processed File (.lsl)"
+                description="Opens the corresponding .lsl file"
+                icon="AllIcons.Actions.Preview">
+        </action>
+
+        <!-- Tab Right-Click Menu -->
+        <group id="Lsl.ProcessedFileGroup"
+                text="LSL Preprocessor"
+                popup="false">
+            <add-to-group group-id="EditorTabPopupMenu"
+                    anchor="first"/>
+            <add-to-group group-id="ProjectViewPopupMenu"
+                    anchor="first"/>
+
+            <reference ref="Lsl.OpenProcessedFile"/>
+            <separator/>
+        </group>
+    </actions>
+
     <extensions defaultExtensionNs="com.intellij">
         <!-- Project Services -->
         <projectService serviceImplementation="io.github.koollsl.lsl.preprocessor.LslPreprocessorEngine"/>
+
+        <!-- LSL Language Definitions & Syntax -->
+        <fileType
+                name="LSL file"
+                implementationClass="LslFileType"
+                fieldName="INSTANCE"
+                language="LSL"
+                extensions="lslp;lslm;lsl"/>
+
+        <!-- unpack secondlife.d.luau in the background on startup-->
+        <postStartupActivity implementation="io.github.koollsl.lsl.slua.SluaDefinitionInitializer"/>
+
+        <!-- Suggest Luau plugin if none is installed -->
+        <editorNotificationProvider
+                implementation="io.github.koollsl.lsl.slua.SluaEditorNotificationProvider"/>
 
         <!-- Code Vision Providers -->
         <codeInsight.daemonBoundCodeVisionProvider
@@ -34,13 +90,6 @@
         <config.codeVisionGroupSettingProvider
                 implementation="io.github.koollsl.lsl.references.LslCodeVisionGroupSettingProvider"/>
 
-        <!-- Language Definitions & Syntax -->
-        <fileType
-                name="LSL file"
-                implementationClass="LslFileType"
-                fieldName="INSTANCE"
-                language="LSL"
-                extensions="lslp;lslm;lsl"/>
         <editorNotificationProvider
                 implementation="io.github.koollsl.lsl.safeguards.LslBuildOutputNotificationProvider"/>
         <writingAccessProvider
@@ -280,44 +329,5 @@
                 level="ERROR"/>
     </extensions>
 
-    <actions>
-        <action id="io.github.koollsl.lsl.actions.LslCreateSourceFileAction"
-                class="io.github.koollsl.lsl.actions.LslCreateSourceFileAction"
-                text="LSL Source Script"
-                description="Create a new LSL source file (.lslp)">
-            <add-to-group group-id="NewGroup"
-                    anchor="before"
-                    relative-to-action="NewFile"/>
-        </action>
 
-        <action id="io.github.koollsl.lsl.actions.LslCreateModuleFileAction"
-                class="io.github.koollsl.lsl.actions.LslCreateModuleFileAction"
-                text="LSL Module Script"
-                description="Create a new LSL module file (.lslm)">
-            <add-to-group group-id="NewGroup"
-                    anchor="after"
-                    relative-to-action="io.github.koollsl.lsl.actions.LslCreateSourceFileAction"/>
-        </action>
-
-        <!-- Action 1: Open in new/focused Tab -->
-        <action id="Lsl.OpenProcessedFile"
-                class="io.github.koollsl.lsl.actions.OpenProcessedLslAction"
-                text="Open Processed File (.lsl)"
-                description="Opens the corresponding .lsl file"
-                icon="AllIcons.Actions.Preview">
-        </action>
-
-        <!-- Tab Right-Click Menu -->
-        <group id="Lsl.ProcessedFileGroup"
-                text="LSL Preprocessor"
-                popup="false">
-            <add-to-group group-id="EditorTabPopupMenu"
-                    anchor="first"/>
-            <add-to-group group-id="ProjectViewPopupMenu"
-                    anchor="first"/>
-
-            <reference ref="Lsl.OpenProcessedFile"/>
-            <separator/>
-        </group>
-    </actions>
 </idea-plugin>

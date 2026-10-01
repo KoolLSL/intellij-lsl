@@ -10,7 +10,7 @@ import com.intellij.openapi.options.colors.ColorSettingsPage
 import javax.swing.Icon
 
 class LslColorSettingsPage : ColorSettingsPage {
-    override fun getIcon(): Icon = LslIcons.FILE
+    override fun getIcon(): Icon = LslIcons.FILE_LSLP
 
     override fun getHighlighter(): SyntaxHighlighter = LslSyntaxHighlighter()
 

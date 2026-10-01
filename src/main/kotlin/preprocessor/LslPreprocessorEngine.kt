@@ -21,8 +21,11 @@ import com.intellij.psi.*
 import com.intellij.psi.util.*
 import io.github.koollsl.lsl.parser.LslTypes
 import io.github.koollsl.lsl.psi.*
-import io.github.koollsl.lsl.safeguards.LslBuildOutputNotificationProvider
 import io.github.koollsl.lsl.settings.LslSettings
+import io.github.koollsl.lsl.utils.LslFileTypeUtils.BUILD_TARGET_EXTENSIONS
+import io.github.koollsl.lsl.utils.LslFileTypeUtils.isBuildFile
+import io.github.koollsl.lsl.utils.LslFileTypeUtils.isHeaderModule
+import io.github.koollsl.lsl.utils.LslFileTypeUtils.isLslSource
 import io.github.koollsl.lsl.utils.getPathKey
 import java.io.File
 import java.text.SimpleDateFormat
@@ -460,8 +463,11 @@ class LslPreprocessorEngine(private val project: Project) {
 
     fun processLslpFile( virtualFile: VirtualFile, project: Project): VirtualFile? {
         if (project.isDisposed || !virtualFile.isValid) return null
-        if (virtualFile.extension?.lowercase() != "lslp") return null
-        if (LslBuildOutputNotificationProvider.isGeneratedBuildFile(virtualFile)) return null
+        if (!isLslSource(virtualFile)) return null
+        if (isBuildFile(virtualFile)) return null
+        // .lslm files are include-only headers/modules. They are resolved recursively
+        // when preprocessing root scripts, but should not generate standalone /build/ outputs.
+        if (virtualFile.extension.equals("lslm", ignoreCase = true)) return null
 
         val parentDir = virtualFile.parent ?: return null
         val fileNameWithoutExtension = virtualFile.nameWithoutExtension
@@ -475,10 +481,10 @@ class LslPreprocessorEngine(private val project: Project) {
                 val sourceParentFile = File(parentDir.path).canonicalFile
                 val buildDir = File(sourceParentFile, "build").canonicalFile
                 if (!buildDir.exists()) buildDir.mkdirs()
-                purgeNonLslFiles(buildDir, parentDir)
+                purgeNonBuildFiles(buildDir, parentDir)
             }
         } else {
-            purgeNonLslVirtualFiles(parentDir)
+            purgeNonBuildVirtualFiles(parentDir)
         }
 
         val psiFile = PsiManager.getInstance(project).findFile(virtualFile) ?: return null
@@ -507,26 +513,26 @@ class LslPreprocessorEngine(private val project: Project) {
         return resultFile
     }
 
-    fun purgeNonLslFiles(buildDir: File, parentVirtualDir: VirtualFile? = null) {
+    fun purgeNonBuildFiles(buildDir: File, parentVirtualDir: VirtualFile? = null) {
         runCatching {
             if (buildDir.exists() && buildDir.isDirectory) {
                 buildDir.listFiles()?.forEach { file ->
-                    if (file.extension.lowercase() != "lsl") {
+                    if (file.extension.lowercase() !in BUILD_TARGET_EXTENSIONS) {
                         runCatching { file.delete() }
                     }
                 }
             }
             if (parentVirtualDir != null) {
-                purgeNonLslVirtualFiles(parentVirtualDir)
+                purgeNonBuildVirtualFiles(parentVirtualDir)
             }
         }
     }
 
-    fun purgeNonLslVirtualFiles(parentVirtualDir: VirtualFile) {
+    fun purgeNonBuildVirtualFiles(parentVirtualDir: VirtualFile) {
         runCatching {
             val buildVDir = parentVirtualDir.findChild("build")
             buildVDir?.children?.forEach { child ->
-                if (child.extension?.lowercase() != "lsl") {
+                if (child.extension?.lowercase() !in BUILD_TARGET_EXTENSIONS) {
                     ApplicationManager.getApplication().runWriteAction {
                         runCatching { child.delete(this) }
                     }
@@ -539,52 +545,39 @@ class LslPreprocessorEngine(private val project: Project) {
     fun processFileOnSave(virtualFile: VirtualFile) {
         if (project.isDisposed || !virtualFile.isValid) return
 
-        // Ignore files inside excluded directories
+        // 1. Guard against excluded or generated build files in /build/
         val fileIndex = ProjectRootManager.getInstance(project).fileIndex
-        if (fileIndex.isExcluded(virtualFile)) return
+        if (fileIndex.isExcluded(virtualFile) || isBuildFile(virtualFile)) return
 
-        val ext = virtualFile.extension?.lowercase() ?: return
-        if (ext != "lslp" && ext != "lslm") return
+        // 2. Ensure it's a valid LSL source file (.lsl, .lslp)
+        if (!isLslSource(virtualFile)) return
 
         val documentManager = PsiDocumentManager.getInstance(project)
         val fileDocumentManager = FileDocumentManager.getInstance()
 
-        // 1. Save all open tabs to disk so includes read updated text
+        // 3. Save all open tabs and sync PSI so preprocessor reads fresh text
         fileDocumentManager.saveAllDocuments()
-
         if (documentManager.hasUncommitedDocuments()) {
             documentManager.commitAllDocuments()
         }
 
-        // PsiManager.getInstance(project).dropPsiCaches()
-
-        // 2. Process dependent files
-        if (ext == "lslp") {
-            // Refresh ONLY the .lslm files explicitly included by this .lslp file
-//            val psiFile = virtualFile.toPsi() ?: return
-//            val referencedLslmFiles = LslIncludesCollector.getInstance(project).collectIncludedLslmFiles(
-//                file = psiFile
-//            )
-//
-//            for (lslmPsi in referencedLslmFiles) {
-//                lslmPsi.toVf()?.refresh(false, false)
-//            }
-            // Direct save on .lslp -> getCachedProcessDirectives dynamically resolves all #includes
-            processLslpFile(virtualFile, project)
-        } else {
-            // Saving an .lslm header: refresh itself first
+        // 4. Clean separation between header module (.lslm) and entry point (.lsl / .lslp)
+        if (isHeaderModule(virtualFile)) {
+            // MODULE HEADER (.lslm): Refresh itself & recompile dependent root scripts
             virtualFile.refresh(false, false)
 
-            // Re-run processing ONLY on .lslp files that actually depend on this .lslm header
-            val dependentLslpFiles = LslIncludesCollector.getInstance(project)
-                .collectDependentLslpFiles(virtualFile)
-            //val dependentLslpFiles = collectDependentLslpFiles(virtualFile, project)
-            for (lslpFile in dependentLslpFiles) {
-                processLslpFile(lslpFile, project)
+            val dependentFiles = LslIncludesCollector.getInstance(project)
+                .collectDependentSourceFiles(virtualFile)
+
+            for (sourceFile in dependentFiles) {
+                processLslpFile(sourceFile, project)
             }
+        } else {
+            // ROOT SCRIPT (.lsl or .lslp outside /build/): Compile directly into /build/
+            processLslpFile(virtualFile, project)
         }
 
-        // Notify IntelliJ of project-wide PSI/macro updates
+        // 5. Notify IntelliJ of project-wide PSI/macro updates
         project.messageBus
             .syncPublisher(PsiModificationTracker.TOPIC)
             .modificationCountChanged()
@@ -756,12 +749,12 @@ class LslPreprocessorEngine(private val project: Project) {
             val statsText = getSectionStatsText(section)
 
             if (!hasAny) {
-                sb.appendCleanLine("// --- CONSUMED INCLUDE: ${section.fileName} ($statsText) ---").appendLine()
+                sb.appendCleanLine("// --- CONSUMED INCLUDE: ${section.fileName.substringBeforeLast('.')} ($statsText) ---").appendLine()
                 return
             }
 
             if (hasDirect) {
-                sb.appendCleanLine("// --- BEGIN INCLUDE: ${section.fileName} ($statsText) ---")
+                sb.appendCleanLine("// --- BEGIN INCLUDE: ${section.fileName.substringBeforeLast('.')} ($statsText) ---")
 
                 for (item in section.items) {
                     when (item) {
@@ -782,7 +775,7 @@ class LslPreprocessorEngine(private val project: Project) {
                 val current = sb.toString().trimEnd()
                 sb.setLength(0)
                 sb.appendCleanLine(current)
-                sb.appendCleanLine("// --- END INCLUDE: ${section.fileName} ---").appendLine()
+                sb.appendCleanLine("// --- END INCLUDE: ${section.fileName.substringBeforeLast('.')} ---").appendLine()
             } else {
                 for (item in section.items) {
                     if (item is PreprocessedItem.IncludeSection) {

@@ -27,8 +27,6 @@ abstract class LslCreateFileActionBase(
     ) {
         super.postProcess(createdElement, templateName, customProperties)
 
-        if (createdElement !is LslFile) return
-
         val project = createdElement.project
         val editor = FileEditorManager.getInstance(project).selectedTextEditor ?: return
         val document = editor.document
@@ -39,16 +37,18 @@ abstract class LslCreateFileActionBase(
 
             PsiDocumentManager.getInstance(project).doPostponedOperationsAndUnblockDocument(document)
 
-            val statementBlock = PsiTreeUtil.findChildOfType(createdElement, LslStatementBlock::class.java)
-            if (statementBlock != null) {
-                // For LSL Source Scripts (.lslp): place caret inside state_entry block
-                val brace = statementBlock.braceLeftEl
-                if (brace != null) {
-                    editor.caretModel.moveToOffset(brace.textRange.endOffset + 1)
+            if (createdElement is LslFile) {
+                val statementBlock = PsiTreeUtil.findChildOfType(createdElement, LslStatementBlock::class.java)
+                if (statementBlock != null) {
+                    // For LSL Source Scripts (.lslp): place caret inside state_entry block
+                    val brace = statementBlock.braceLeftEl
+                    if (brace != null) {
+                        editor.caretModel.moveToOffset(brace.textRange.endOffset + 1)
+                    }
+                } else {
+                    // For LSL Module Scripts (.lslm): place caret at the end of the header comment
+                    editor.caretModel.moveToOffset(document.textLength)
                 }
-            } else {
-                // For LSL Module Scripts (.lslm): place caret at the end of the header comment
-                editor.caretModel.moveToOffset(document.textLength)
             }
         }
     }

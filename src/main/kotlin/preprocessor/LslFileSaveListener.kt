@@ -11,24 +11,21 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.ProjectRootManager
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.PsiDocumentManager
-import io.github.koollsl.lsl.safeguards.LslBuildOutputNotificationProvider
+import io.github.koollsl.lsl.utils.LslFileTypeUtils
 
 @Service(Service.Level.PROJECT)
 class LslFileSaveListener(private val project: Project) : FileDocumentManagerListener {
 
     override fun beforeDocumentSaving(document: Document) {
         val file: VirtualFile = FileDocumentManager.getInstance().getFile(document) ?: return
-        val ext = file.extension?.lowercase() ?: return
-        if (ext != "lslp" && ext != "lslm") return
-        if (LslBuildOutputNotificationProvider.isGeneratedBuildFile(file)) return
-        // Only process files belonging to THIS project
-        val belongsToProject = ProjectRootManager.getInstance(project)
-            .fileIndex
-            .isInContent(file)
-
-        if (!belongsToProject) {
+        // Ensure it is an LSL source file (checks valid LSL extension & ensures it's NOT a build artifact)
+        if (!LslFileTypeUtils.isLslSource(file)) return
+        // Do nothing if file is explicitly excluded in IDE, or not part of THIS project
+        val fileIndex = ProjectRootManager.getInstance(project).fileIndex
+        if (fileIndex.isExcluded(file) || !fileIndex.isInContent(file)) {
             return
         }
+
         ApplicationManager.getApplication().invokeLater {
             if (!project.isDisposed) {
                 WriteCommandAction.runWriteCommandAction(project, "LSL Preprocess File", null, Runnable {
