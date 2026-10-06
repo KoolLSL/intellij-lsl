@@ -167,7 +167,7 @@
 
         <applicationConfigurable
                 parentId="language"
-                instance="io.github.koollsl.lsl.settings.LslSettingsConfigurable"
+                instance="io.github.koollsl.lsl.shared.settings.LslSettingsConfigurable"
                 id="settings.LslSettingsConfigurable"
                 displayName="LSL"/>
 

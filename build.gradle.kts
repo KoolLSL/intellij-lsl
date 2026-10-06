@@ -1,6 +1,8 @@
+
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.zip.ZipFile
+
 
 plugins {
     id("java")
@@ -187,16 +189,10 @@ tasks.register("installPluginToIDE") {
 
         println("✔ Plugin installed correctly into: $targetDir")
 
-        project.exec {
-            commandLine(
-                "powershell",
-                "-NoProfile",
-                "-Command",
-                // Stop IntelliJ if running
-                "\$p = Get-Process idea64 -ErrorAction SilentlyContinue; " +
-                        "if (\$p) { \$p.CloseMainWindow(); Start-Sleep -Seconds 2; \$p.Kill() }; "
-            )
+        // Close all IDEs gracefully. Warning: "exit" is not documented anywhere
+        exec {
+            commandLine("C:\\Program Files\\JetBrains\\IntelliJ IDEA 2026.2.1\\bin\\idea.exe", "exit")
         }
+
     }
 }
-

@@ -3,6 +3,7 @@ package io.github.koollsl.lsl.slua
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
+import io.github.koollsl.lsl.shared.definitions.DefinitionsSourceManager
 import java.io.File
 
 object SluaDefinitionManager {
@@ -25,4 +26,7 @@ object SluaDefinitionManager {
     fun getDefinitionFilePath(project: Project): String {
         return SluaDefinitionData.getInstance(project).definitionsFile.absolutePath
     }
+
+    fun getDocumentationFilePath(): String =
+        DefinitionsSourceManager.getLuauDocsFile().absolutePath
 }

@@ -21,7 +21,8 @@ import com.intellij.psi.*
 import com.intellij.psi.util.*
 import io.github.koollsl.lsl.parser.LslTypes
 import io.github.koollsl.lsl.psi.*
-import io.github.koollsl.lsl.settings.LslSettings
+import io.github.koollsl.lsl.shared.definitions.DefinitionsSourceManager
+import io.github.koollsl.lsl.shared.settings.LslSettings
 import io.github.koollsl.lsl.utils.LslFileTypeUtils.BUILD_TARGET_EXTENSIONS
 import io.github.koollsl.lsl.utils.LslFileTypeUtils.isBuildFile
 import io.github.koollsl.lsl.utils.LslFileTypeUtils.isHeaderModule
@@ -961,7 +962,7 @@ class LslPreprocessorEngine(private val project: Project) {
 
 
         val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(Date())
-        val kwdbSourceInfo = KwdbData.getInstance(file.project).kwdbSourceInfo
+        val kwdbInfo = DefinitionsSourceManager.getLslDefinitionsInfo()
 
         // 1. Find the specific module that owns the file being compiled/processed
         // File's parent directory comes FIRST, followed by module roots (no project-wide fallback)
@@ -998,7 +999,7 @@ class LslPreprocessorEngine(private val project: Project) {
 
         sb.appendLine("// ---------------------------------------------------------------")
         sb.appendLine("// LSL plugin version     : $fileName $version")
-        sb.appendLine("// Keyword database       : $kwdbSourceInfo")
+        sb.appendLine("// LSL definitions        : ${kwdbInfo.source} ${kwdbInfo.datetime}")
         sb.appendLine("// ---------------------------------------------------------------")
         sb.appendLine()
 

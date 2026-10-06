@@ -1,14 +1,12 @@
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Key
-import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.psi.PsiElement
 import com.intellij.psi.util.PsiTreeUtil
+import io.github.koollsl.lsl.shared.definitions.DefinitionsSourceManager
 import io.github.koollsl.lsl.psi.*
-import io.github.koollsl.lsl.settings.LslSettings
 import org.yaml.snakeyaml.LoaderOptions
 import org.yaml.snakeyaml.Yaml
 import java.io.InputStream
-import java.nio.file.Path
 
 class KwdbData(val project: Project) {
     val data: Map<String, Any>
@@ -97,35 +95,8 @@ class KwdbData(val project: Project) {
     }
 
     private fun obtainYamlStream(): InputStream? {
-        val customPathStr = try {
-            LslSettings.instance.customKwdbPath
-        } catch (e: Exception) {
-            ""
-        }
-
-        if (customPathStr.isNotBlank()) {
-            val customPath = Path.of(customPathStr)
-            val customFile = customPath.toFile()
-            if (customFile.exists()) {
-                val vFile = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(customFile)
-                if (vFile != null && vFile.isValid) {
-                    kwdbSourceInfo = "Custom (${customFile.name})"
-                    return vFile.inputStream
-                }
-            }
-        }
-
-        val stream = javaClass.classLoader.getResourceAsStream("lsl_definitions.yaml")
-            ?: javaClass.getResourceAsStream("/lsl_definitions.yaml")
-            ?: KwdbData::class.java.classLoader.getResourceAsStream("lsl_definitions.yaml")
-
-        if (stream != null) {
-            kwdbSourceInfo = "Integrated lsl_definitions.yaml"
-            return stream
-        }
-
-        kwdbSourceInfo = "Error: Resource lsl_definitions.yaml not found"
-        return null
+        kwdbSourceInfo = DefinitionsSourceManager.getLslSourceDescription()
+        return DefinitionsSourceManager.openLslDefinitions()
     }
 
     private fun cleanType(typeStr: String?): String = when (typeStr?.lowercase()?.trim()) {
