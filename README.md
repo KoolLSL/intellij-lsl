@@ -88,27 +88,35 @@ For LSL, you can split your code into reusable files and include them in your sc
 ---
 
 ### Auto-completion
-* LSL
-![Auto-completion.png](docs/assets/IntelliJ-Auto-completion.png)
+- **LSL**
 
-* SLua
- ![SLua-Auto-completion.png](docs/assets/SLua-Auto-completion.png)
+  ![LSL auto-completion](docs/assets/IntelliJ-Auto-completion.png)
+
+- **SLua**
+
+  ![SLua auto-completion](docs/assets/SLua-Auto-completion.png)
 
 ---
 
 ### Inspections & Errors
-* LSL
-![Errors.png](docs/assets/IntelliJ-Errors.png)
-* SLua
-![Slua-Errors.png](docs/assets/Slua-Errors.png)
+- **LSL**
+
+  ![LSL inspections and errors](docs/assets/IntelliJ-Errors.png)
+
+- **SLua**
+
+  ![SLua inspections and errors](docs/assets/Slua-Errors.png)
 
 ---
 
 ### Quick Documentation Popup
-* LSL
-![Wiki popup](docs/assets/IntelliJ-Wiki-popup.png)
-* SLua
-![SLua-Wiki-popup.png](docs/assets/SLua-Wiki-popup.png)
+- **LSL**
+
+  ![LSL quick documentation popup](docs/assets/IntelliJ-Wiki-popup.png)
+
+- **SLua**
+
+  ![SLua quick documentation popup](docs/assets/SLua-Wiki-popup.png)
 
 ---
 ### Smart Refactor
