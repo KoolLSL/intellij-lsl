@@ -33,6 +33,7 @@ class KwdbData(val project: Project) {
     }
 
     init {
+        // Load and merge YAML definitions before generating the PSI model used by lookups.
         val stream = obtainYamlStream()
             ?: throw IllegalStateException("YAML stream could not be obtained.")
 
@@ -77,6 +78,7 @@ class KwdbData(val project: Project) {
 
     @Suppress("UNCHECKED_CAST")
     private fun mergeMaps(target: MutableMap<String, Any>, source: Map<*, *>) {
+        // Merge nested definition sections so later YAML documents can extend earlier ones.
         source.forEach { (k, v) ->
             val key = k.toString()
             if (v != null) {
@@ -110,6 +112,7 @@ class KwdbData(val project: Project) {
         val sb = StringBuilder()
 
         fun formatParams(entry: Map<*, *>): String {
+            // Definitions may represent arguments as either a list or a name-keyed map.
             val rawArgs = entry["arguments"] ?: entry["params"] ?: entry["parameters"]
 
             val paramList = mutableListOf<Pair<String, String>>()
@@ -162,6 +165,7 @@ class KwdbData(val project: Project) {
         }
 
         fun formatParamDocs(entry: Map<*, *>): String {
+            // Event docs include per-parameter explanations from the canonical definitions.
             val args = entry["arguments"] as? List<*> ?: return ""
             val paramDocs = mutableListOf<String>()
 
@@ -206,6 +210,7 @@ class KwdbData(val project: Project) {
             return sections.joinToString("<p>")
         }
 
+        // Build both the generated LSL declarations and the documentation lookup as we go.
         // Constants
         (data["constants"] as? Map<*, *>)?.forEach { (name, rawEntry) ->
             val entry = rawEntry as? Map<*, *> ?: return@forEach
@@ -232,7 +237,8 @@ class KwdbData(val project: Project) {
             val tooltip = (entry["tooltip"] as? String).orEmpty()
             val sleepVal = (entry["sleep"] as? Number)?.toDouble() ?: 0.0
             val extraInfo = if (sleepVal > 0.0) "[Forced delay: ${sleepVal}s]" else null
-            val paramDocs = formatParamDocs(entry)
+            // paramDocs = formatParamDocs(entry) is less useful for functions than for events
+            val paramDocs = ""
             val doc = formatCommentBlock(tooltip, extraInfo, paramDocs)
             if (doc.isNotBlank()) {
                 elementDocumentation[name.toString()] = doc

@@ -25,7 +25,7 @@ class SluaEditorNotificationProvider : EditorNotificationProvider {
         const val LUAU_PLUGIN_ID = "com.github.aleksandrsl.intellijluau"
         const val LUAU_PLUGIN_NAME = "Luau"
         const val LUAU_PLUGIN_MARKETPLACE_URL =
-            "https://plugins.jetbrains.com/plugin/24957-luau"
+            "https://plugins.jetbrains.com/plugin/24957"
 
         fun getLuauPluginStatus(): LuauPluginStatus {
             val plugin = PluginManagerCore.getPlugin(PluginId.getId(LUAU_PLUGIN_ID))

@@ -2,7 +2,7 @@
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
 ![GitHub](https://img.shields.io/github/license/KoolLSL/intellij-lsl)
 
-Write Linden Scripting Language (LSL) directly inside IntelliJ IDEA, PyCharm, Android Studio, and other JetBrains
+Write **LSL** (Linden Scripting Language) and **SLua** (Server Lua) for *Second Life* directly inside IntelliJ IDEA, PyCharm, Android Studio, and other JetBrains
 editors across Windows, macOS, and Linux.
 
 <img src="docs/assets/Intellij-plugin.png" alt="Plugin Screenshot" width="600"/>
@@ -10,54 +10,68 @@ editors across Windows, macOS, and Linux.
 ### Key Features
 
 * **Project & File Organization:** Manage large multi-file projects using structured project views, shared library, local history, file comparison, GitHub integration, and more.
-* **Advanced Preprocessor:** Use file inclusions (`#include`), function inlining (`#inline`), and conditional blocks
-  (`#ifdef`...) to organize large script projects.
-* **Memory Optimization:** Built-in constant optimization evaluates static math, replaces fixed variables, and eliminates dead code before compiling — keeping your script's memory footprint as small as possible in Second Life.
-* **LSL Database:** Use the popular [kwdb.xml](https://github.com/Sei-Lisa/kwdb) from Sei-Lisa for the definition of
-  functions, constants, and events. When new LSL functions are released, you can download or edit the XML file yourself
-  without waiting for a plugin update!
+* **Up-to-date language definitions:** LSL functions, constants, and events, along with SLua definitions and documentation, come from the official [Second Life language definitions](https://github.com/secondlife/lsl-definitions)
+  project. The plugin checks for updates or can use a custom definitions folder instead.
 * **Code Formatting & Clean Up:** Automatically format your code, fix indentation, and keep your scripts clean and readable.
 * **Smart Scripting Tools:** Instant syntax highlighting, real-time error checking, smart auto-completion, and safe variable/function refactoring.
+* **Advanced Preprocessor (LSL only):** Use file inclusions (`#include`), function inlining (`#inline`), and conditional blocks (`#ifdef`...) to organize large script projects. SLua uses a module system instead.
+* **Memory Optimization (LSL only):** Before compiling, built-in constant optimization evaluates static math, replaces fixed variables, and eliminates dead code to help keep scripts within LSL's memory limits. SLua has its own methods.
+
+### IntelliJ vs VS Code
+
+Both editors are great for Second Life scripting; the choice depends on how you like to work. The
+[official Second Life VS Code extension](https://github.com/secondlife/sl-vscode-plugin) offers a direct connection
+to the Viewer and can be a lightweight fit for smaller projects. IntelliJ may suit you better if you're organizing
+many scripts, navigating shared code, refactoring names across files, or simply prefer a more structured IDE. It also
+works well offline and does not depend on the SL Viewer for day-to-day scripting work.
+This plugin doesn't yet connect directly to the Viewer. For now, you can use Firestorm's `#include` and **Recompile**
+options to compile your project scripts in-world. Direct Viewer integration may be added in the future.
 
 ---
 ### How to Install
 
-1. Open your JetBrains IDE such as [IntelliJ IDEA](https://www.jetbrains.com/idea/), PyCharm, Android Studio, or any
-   other compatible IDE.
-2. Choose your preferred installation method:
+1. Open your JetBrains IDE such as [IntelliJ IDEA](https://www.jetbrains.com/idea/).
+2. Install the plugin using your preferred method:
     * **Marketplace (Direct):**
     * [![Get Plugin on JetBrains Marketplace](https://img.shields.io/badge/Get%20Plugin-JetBrains%20Marketplace-000000?style=for-the-badge&logo=jetbrains)](https://plugins.jetbrains.com/plugin/34339)
     * **Manual ZIP:**  
       Go to **Settings** → **Plugins** , click the **⚙️ icon** at top → **Install Plugin from Disk...** to use a
-      downloaded
-      `intellij-lsl.zip` from [GitHub Releases](https://github.com/KoolLSL/intellij-lsl/releases).
+      downloaded `intellij-lsl.zip` from [GitHub Releases](https://github.com/KoolLSL/intellij-lsl/releases).
+3. Complete language setup:
+   * **LSL:** works out of the box with no extra setup.
+   * **SLua:** the plugin checks for the companion [Luau plugin](https://plugins.jetbrains.com/plugin/24957) and offers a
+     one-click install if needed. It then makes Second Life's SLua definitions available to that companion plugin.
+
+4.  Type **LSL** in your IDE **Settings** to quickly access and customize plugin options.
+
+
 
 ### How to Use
 
 1. **Create a Project:** Open your IDE, go to **File → New → Project...** and create an empty project, or use **File →
    New → Project from existing sources...**.
-2. **Add Source File:** **File → New → LSL Source Script...**: Create your main script here (e.g., `MyScript.lslp`).
-3. **Build:** Save your `.lslp` file (`Ctrl+S`). The plugin automatically generates an optimized, read-only **`.lsl`**
-   script in the `/build` folder (e.g., `/build/MyScript.lsl`).
-    * *Tip:* Right-click the `.lslp` editor tab and select **Open Generated .lsl** to quickly view the generated output
-      in a new tab.
-4. **Import into Second Life:** If you use the **Firestorm Viewer**, enable its LSL preprocessor to link directly to the
-   generated `.lsl` file on your local disk when compiling in-world (e.g., using
-   `#include "MyProject/build/MyScript.lsl"`). Alternatively, copy and paste the generated `.lsl` contents into your
-   in-world script editor.
+2. **Choose your language:**
+   * **LSL:** Select **File → New → LSL Source Script...** to create a `.lslp` source file (for example,
+     `MyScript.lslp`). Save it (`Ctrl+S`) to build it; the plugin generates an optimized, read-only `.lsl` file in the
+     `/build` folder (for example, `/build/MyScript.lsl`). Right-click the `.lslp` editor tab and select
+     **Open Generated .lsl** to view the output.
+   * **SLua:** Select **File → New → Luau File** to create a `.luau` script. There is no separate build step: the `.luau` file is the script you use.
+3. **Use your script in Second Life:** Firestorm users can enable its LSL preprocessor and include the
+   `.lsl` or `.luau` file from disk (for example, `#include "MyProject/build/MyScript.lsl"`), or copy and paste its
+   contents into the in-world editor.
 
-   *Tip: Type **LSL** in your IDE **Settings** to quickly access and customize plugin options.*
+
 
 ---
 
-### Modules (Optional)
+### Include Files (LSL only)
 
-You can split your codebase into reusable files or use preprocessor directives as your project grows.
+For LSL, you can split your code into reusable files and include them in your scripts as your project grows.
 
-* **Module Files (`.lslm`):** Create shared files to store functions or constants with **File → New → LSL Module
-  Script...** (e.g., `MyLib.lslm`).
-* **Including Modules:** Import your created `.lslm` files into any `.lslp` script using standard preprocessor syntax:
-  (e.g., `#include "MyLib.lslm"`). *(External folders must be added as Content Roots in Project Structure).*
+* **Create an include file (`.lslm`):** Use **File → New → LSL Module Script...** to create a shared file for functions
+  or constants (for example, `MyLib.lslm`).
+* **Include it in a script:** Add `#include "MyLib.lslm"` to an `.lslp` script. *(External folders must be added as
+  Content Roots in Project Structure.)*
 ### Directives
 
 * **`#define`** — Defines a constant or macro (e.g., `#define MODEL "PRO"`).
@@ -68,30 +82,44 @@ You can split your codebase into reusable files or use preprocessor directives a
 * **`#elif`** — Alternative conditional branch (`else if`) within a block.
 * **`#else`** — Fallback branch when prior conditions fail.
 * **`#endif`** — Closes an active conditional block.
-* **`#include`** — Merges an external `.lslm` module (e.g., `#include "Vectors.lslm"`). The file must be in the same
+* **`#include`** — Includes an external `.lslm` file (e.g., `#include "Vectors.lslm"`). The file must be in the same
   folder or in a folder of the Project properties / Content roots.
 * **`#inline`** — Inlines the function written below directly in the code instead of calling it.
 ---
 
 ### Auto-completion
-
+* LSL
 ![Auto-completion.png](docs/assets/IntelliJ-Auto-completion.png)
 
-### Inspections & Errors
+* SLua
+ ![SLua-Auto-completion.png](docs/assets/SLua-Auto-completion.png)
 
+---
+
+### Inspections & Errors
+* LSL
 ![Errors.png](docs/assets/IntelliJ-Errors.png)
+* SLua
+![Slua-Errors.png](docs/assets/Slua-Errors.png)
+
+---
 
 ### Quick Documentation Popup
-
+* LSL
 ![Wiki popup](docs/assets/IntelliJ-Wiki-popup.png)
+* SLua
+![SLua-Wiki-popup.png](docs/assets/SLua-Wiki-popup.png)
 
+---
 ### Smart Refactor
-
 ![Refactor](docs/assets/IntelliJ-Refactor.png)
 
 ---
 
-### Building the plugin
+### Building the plugin (optional)
+
+This project is open source, ready to use out of the box, and you do not need to build it for normal usage. The plugin is already available via the
+JetBrains Marketplace and GitHub Releases, so building it locally is mainly for contributors who want to modify the source, or test a custom build.
 
 1. **Open Project:** Open the repository root folder in IntelliJ IDEA (2026.2.1+).
 2. **Test / Install:** In the Gradle tool window, run `Tasks -> intellij -> runIde` to launch a sandbox IDE, or
@@ -110,7 +138,6 @@ This project is a modernized fork of the original [riej/lsl](https://github.com/
 Compared to Eclipse/LSLForge, this plugin has no internal simulator but offers preprocessing and syntax checking inside
 the more modern JetBrains IDEs. This also makes the plugin easier to install and maintain.
 
-See [official LSL documentation](https://wiki.secondlife.com/wiki/LSL_Portal).
 
 <sub style="color: #6a737d;">
 Second Life® and SL™ are registered trademarks of Linden Research, Inc. This plugin is an independent third-party tool and is not affiliated with, sponsored by, or endorsed by Linden Research, Inc.

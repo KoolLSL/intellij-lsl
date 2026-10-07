@@ -44,6 +44,7 @@ object DocumentationUtils {
                 else -> el.text
             }
 
+            // Walking backward, so prepend to preserve the comments' source order.
             sb.insert(0, "<p>$commentText</p>")
 
             el = el.prevSibling
@@ -58,11 +59,12 @@ object DocumentationUtils {
         return sb.toString()
     }
 
+    /** Builds the Second Life Wiki URL used as a documentation fallback. */
     fun getUrlFor(name: String?): String? =
         if (name != null) "https://wiki.secondlife.com/wiki/$name" else null
 
     /**
-     * Generates documentation for function and event arguments lists.
+     * Renders a syntax-highlighted parameter list for function and event signatures.
      */
     fun makeDocumentationForArguments(argumentList: List<LslArgument>, sb: StringBuilder) {
         HtmlSyntaxInfoUtil.appendStyledSpan(
