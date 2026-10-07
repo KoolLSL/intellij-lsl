@@ -1,6 +1,6 @@
 package io.github.koollsl.lsl.slua
 
-import com.intellij.ide.plugins.PluginManagerConfigurable
+import com.intellij.ide.BrowserUtil
 import com.intellij.ide.plugins.PluginManagerCore
 import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.fileEditor.FileEditor
@@ -48,13 +48,8 @@ class SluaEditorNotificationProvider : EditorNotificationProvider {
             return Function {
                 val panel = EditorNotificationPanel(EditorNotificationPanel.Status.Warning)
                 panel.text = "$LUAU_PLUGIN_NAME plugin is disabled. Enable it to get syntax highlighting and language server analysis for .luau scripts."
-                panel.createActionLabel("Enable $LUAU_PLUGIN_NAME") {
-                    ShowSettingsUtil.getInstance().showSettingsDialog(
-                        project,
-                        PluginManagerConfigurable::class.java
-                    ) { configurable ->
-                        configurable.openMarketplaceTab(LUAU_PLUGIN_ID)
-                    }
+                panel.createActionLabel("Open Plugins settings") {
+                    ShowSettingsUtil.getInstance().showSettingsDialog(project, "Plugins")
                 }
                 panel
             }
@@ -82,12 +77,7 @@ class SluaEditorNotificationProvider : EditorNotificationProvider {
             val panel = EditorNotificationPanel(EditorNotificationPanel.Status.Info)
             panel.text = "$LUAU_PLUGIN_NAME support is not installed. Install the $LUAU_PLUGIN_NAME plugin to enable code intelligence."
             panel.createActionLabel("Open Marketplace") {
-                ShowSettingsUtil.getInstance().showSettingsDialog(
-                    project,
-                    PluginManagerConfigurable::class.java
-                ) { configurable ->
-                    configurable.openMarketplaceTab(LUAU_PLUGIN_ID)
-                }
+                BrowserUtil.browse(LUAU_PLUGIN_MARKETPLACE_URL)
             }
             panel
         }

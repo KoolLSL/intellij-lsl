@@ -1,22 +1,24 @@
 <idea-plugin>
     <id>io.github.koollsl.intellij-lsl</id>
-    <name>Linden Scripting Language (LSL)</name>
+    <name>LSL &amp; SLua for Second Life</name>
     <version>GENERATED-BY_build.gradle.kts</version>
 
     <vendor url="https://github.com/KoolLSL/intellij-lsl">KoolLSL</vendor>
 
     <description><![CDATA[
- Write your **Linden Scripting Language (LSL)** scripts in modern JetBrains IDEs.
-*This plugin is a modernized fork of the original `Linden Script ​(LSL) - riej`​.*
+<p>Write <strong>LSL</strong> (Linden Scripting Language) and <strong>SLua</strong> (Server Lua) for <em>Second Life</em> directly inside IntelliJ IDEA, PyCharm, Android Studio, and other JetBrains editors across Windows, macOS, and Linux.</p>
 
--   **Project & File Organization:** Manage large multi-file projects using structured project views, shared library, local history, file comparison, GitHub integration, and more.
--   **Advanced Preprocessor:** Use file inclusions (`#include`), function inlining (`#inline`), and conditional blocks (`#ifdef`...) to organize large script projects.
--   **Memory Optimization:** Built-in constant optimization evaluates static math, replaces fixed variables, and eliminates dead code before compiling — keeping your script's memory footprint as small as possible in Second Life.
--   **LSL Database:** Use the popular [kwdb.xml](https://github.com/Sei-Lisa/kwdb) from Sei-Lisa for the definition of functions, constants, and events. When new LSL functions are released, you can download or edit the XML file yourself without waiting for a plugin update!
--   **Code Formatting & Clean Up:** Automatically format your code, fix indentation, and keep your scripts clean and readable.
--   **Smart Scripting Tools:** Instant syntax highlighting, real-time error checking, smart auto-completion, and safe variable/function refactoring.
+<h3>Key Features</h3>
+<ul>
+  <li><strong>Project &amp; File Organization:</strong> Manage large multi-file projects using structured project views, shared library, local history, file comparison, GitHub integration, and more.</li>
+  <li><strong>Up-to-date language definitions:</strong> LSL functions, constants, and events, along with SLua definitions and documentation, come from the official <a href="https://github.com/secondlife/lsl-definitions">Second Life language definitions</a> project. The plugin checks for updates or can use a custom definitions folder instead.</li>
+  <li><strong>Code Formatting &amp; Clean Up:</strong> Automatically format your code, fix indentation, and keep your scripts clean and readable.</li>
+  <li><strong>Smart Scripting Tools:</strong> Instant syntax highlighting, real-time error checking, smart auto-completion, and safe variable/function refactoring.</li>
+  <li><strong>Advanced Preprocessor (LSL only):</strong> Use file inclusions (<code>#include</code>), function inlining (<code>#inline</code>), and conditional blocks (<code>#ifdef</code>...) to organize large script projects. SLua uses a module system instead.</li>
+  <li><strong>Memory Optimization (LSL only):</strong> Before compiling, built-in constant optimization evaluates static math, replaces fixed variables, and eliminates dead code to help keep scripts within LSL's memory limits. SLua has its own methods.</li>
+</ul>
 
-*Second Life® and SL™ are registered trademarks of Linden Research, Inc. This plugin is an independent third-party tool and is not affiliated with, sponsored by, or endorsed by Linden Lab.*
+<p>Second Life® and SL™ are registered trademarks of Linden Research, Inc. This plugin is an independent third-party tool and is not affiliated with, sponsored by, or endorsed by Linden Research, Inc.</p>
 ]]></description>
 
     <depends>com.intellij.modules.platform</depends>

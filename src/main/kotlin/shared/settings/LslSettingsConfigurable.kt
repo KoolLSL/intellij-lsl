@@ -14,6 +14,7 @@ import com.intellij.ui.dsl.builder.*
 import io.github.koollsl.lsl.shared.definitions.DefinitionsSourceManager
 import io.github.koollsl.lsl.slua.SluaEditorNotificationProvider
 import io.github.koollsl.lsl.slua.SluaServerConfigurationChecker
+import java.io.IOException
 import javax.swing.JComponent
 import javax.swing.JLabel
 import javax.swing.JTextArea
@@ -174,10 +175,16 @@ class LslSettingsConfigurable : SearchableConfigurable {
                         false,
                         false
                     ) {
-                        override fun isFileSelectable(file: VirtualFile?): Boolean = file?.isDirectory == true
-                    }.withTitle("Select Definitions Folder")
+                        override fun validateSelectedFiles(files: Array<VirtualFile>) {
+                            if (files.any { !it.isDirectory }) {
+                                throw IOException("Please select a folder.")
+                            }
+                        }
+                    }
+                        .withTitle("Select Definitions Folder")
                         .withDescription("Select a folder containing the Second Life definitions")
                         .withShowHiddenFiles(true)
+                        .also { it.setForcedToUseIdeaFileChooser(true) }
 
                     textFieldWithBrowseButton(fileChooserDescriptor = descriptor)
                         .bindText(settings::customDefinitionsFolder)

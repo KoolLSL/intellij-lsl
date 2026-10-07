@@ -6,7 +6,7 @@ import java.io.File
 import java.io.IOException
 import java.io.InputStream
 import java.net.HttpURLConnection
-import java.net.URL
+import java.net.URI
 import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
@@ -243,7 +243,7 @@ object DefinitionsSourceManager {
         failures: MutableMap<String, String>
     ): DownloadResult? {
         val cached = cachedFile(definition)
-        val connection = URL(definition.url).openConnection() as HttpURLConnection
+        val connection = URI(definition.url).toURL().openConnection() as HttpURLConnection
         connection.connectTimeout = 10_000
         connection.readTimeout = 20_000
         connection.requestMethod = "GET"
