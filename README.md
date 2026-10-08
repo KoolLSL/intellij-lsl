@@ -2,7 +2,7 @@
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
 ![GitHub](https://img.shields.io/github/license/KoolLSL/intellij-lsl)
 
-Write **LSL** (Linden Scripting Language) and **SLua** (Server Lua) for *Second Life* directly inside IntelliJ IDEA, PyCharm, Android Studio, and other JetBrains
+Write **LSL** (Linden Scripting Language) and **SLua** (Second Life Lua) directly inside IntelliJ IDEA, PyCharm, Android Studio, and other JetBrains
 editors across Windows, macOS, and Linux.
 
 <img src="docs/assets/Intellij-plugin.png" alt="Plugin Screenshot" width="600"/>
@@ -10,22 +10,17 @@ editors across Windows, macOS, and Linux.
 ### Key Features
 
 * **Project & File Organization:** Manage large multi-file projects using structured project views, shared library, local history, file comparison, GitHub integration, and more.
-* **Up-to-date language definitions:** LSL functions, constants, and events, along with SLua definitions and documentation, come from the official [Second Life language definitions](https://github.com/secondlife/lsl-definitions)
-  project. The plugin checks for updates or can use a custom definitions folder instead.
-* **Code Formatting & Clean Up:** Automatically format your code, fix indentation, and keep your scripts clean and readable.
+* **Up-to-date language definitions:** LSL functions, constants, and events, along with SLua definitions and documentation, are downloaded from the official [Second Life language definitions](https://github.com/secondlife/lsl-definitions) project. The plugin checks for updates or can use a custom local folder instead.
 * **Smart Scripting Tools:** Instant syntax highlighting, real-time error checking, smart auto-completion, and safe variable/function refactoring.
-* **Advanced Preprocessor (LSL only):** Use file inclusions (`#include`), function inlining (`#inline`), and conditional blocks (`#ifdef`...) to organize large script projects. SLua uses a module system instead.
+* **Code Formatting & Clean Up:** Automatically format your code, fix indentation, and keep your scripts clean and readable.
+* **Advanced Preprocessor (LSL only):** Use file inclusions (`#include`), function inlining (`#inline`), and conditional blocks (`#ifdef`...) to organize large script projects. SLua uses the `require()` module system instead.
 * **Memory Optimization (LSL only):** Before compiling, built-in constant optimization evaluates static math, replaces fixed variables, and eliminates dead code to help keep scripts within LSL's memory limits. SLua has its own methods.
 
 ### IntelliJ vs VS Code
 
 Both editors are great for Second Life scripting; the choice depends on how you like to work. The
 [official Second Life VS Code extension](https://github.com/secondlife/sl-vscode-plugin) offers a direct connection
-to the Viewer and can be a lightweight fit for smaller projects. IntelliJ may suit you better if you're organizing
-many scripts, navigating shared code, refactoring names across files, or simply prefer a more structured IDE. It also
-works well offline and does not depend on the SL Viewer for day-to-day scripting work.
-This plugin doesn't yet connect directly to the Viewer. For now, you can use Firestorm's `#include` and **Recompile**
-options to compile your project scripts in-world. Direct Viewer integration may be added in the future.
+to the Viewer and can be a lightweight fit for smaller projects. IntelliJ may suit you better if you're working on large projects, navigating multiple scripts and library, or simply prefer a more structured IDE. It works well offline and does not depend on the SL Viewer for day-to-day scripting work. This plugin has not yet a live synchronization with the Viewer. For now, you can use Firestorm's `#include` and **Recompile** options to compile your scripts in-world. Direct Viewer integration may be added in the future if requested.
 
 ---
 ### How to Install
