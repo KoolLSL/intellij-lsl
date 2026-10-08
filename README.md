@@ -75,7 +75,7 @@ to the Viewer and can be a lightweight fit for smaller projects. IntelliJ with t
    * **LSL:** works out of the box with no extra setup.
    * **SLua:** the plugin checks for the companion [Luau plugin](https://plugins.jetbrains.com/plugin/24957) and offers a
      one-click install if needed. It then makes Second Life's SLua definitions available to that companion plugin. **Luau** settings should be like:
-    <img src="docs/assets/Luau-settings.png" alt="Luau settings">
+    <img src="docs/assets/Luau-settings.png" alt="Luau settings"><br>
    * The **Plugins** page should show this (LSP4IJ is needed only for IntelliJ Free edition) :<br>
         <img src="docs/assets/Plugins.png" alt="Luau settings" width="400">
      <br><br>
