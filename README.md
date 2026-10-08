@@ -5,7 +5,7 @@
 Write **LSL** (Linden Scripting Language) and **SLua** (Second Life Lua) directly inside IntelliJ IDEA, PyCharm, Android Studio, and other JetBrains
 editors across Windows, macOS, and Linux.
 
-<img src="docs/assets/Intellij-plugin.png" alt="Plugin Screenshot" width="600"/>
+<img src="docs/assets/Intellij-plugin.png" alt="Plugin Screenshot" width="800"/>
 
 ### Key Features
 
@@ -16,28 +16,82 @@ editors across Windows, macOS, and Linux.
 * **Advanced Preprocessor (LSL only):** Use file inclusions (`#include`), function inlining (`#inline`), and conditional blocks (`#ifdef`...) to organize large script projects. SLua uses the `require()` module system instead.
 * **Memory Optimization (LSL only):** Before compiling, built-in constant optimization evaluates static math, replaces fixed variables, and eliminates dead code to help keep scripts within LSL's memory limits. SLua has its own methods.
 
+### Auto-completion
+- **LSL**
+
+  ![LSL auto-completion](docs/assets/IntelliJ-Auto-completion.png)
+
+- **SLua**
+
+  ![SLua auto-completion](docs/assets/SLua-Auto-completion.png)
+
+---
+
+### Inspections & Errors
+- **LSL**
+
+  ![LSL inspections and errors](docs/assets/IntelliJ-Errors.png)
+
+- **SLua**
+
+  ![SLua inspections and errors](docs/assets/Slua-Errors.png)
+
+---
+
+### Quick Documentation Popup
+- **LSL**
+
+  ![LSL quick documentation popup](docs/assets/IntelliJ-Wiki-popup.png)
+
+- **SLua**
+
+  ![SLua quick documentation popup](docs/assets/SLua-Wiki-popup.png)
+
+---
+### Smart Refactor
+![Refactor](docs/assets/IntelliJ-Refactor.png)
+
+---
+
 ### IntelliJ vs VS Code
 
-Both editors are great for Second Life scripting; the choice depends on how you like to work. The
-[official Second Life VS Code extension](https://github.com/secondlife/sl-vscode-plugin) offers a direct connection
-to the Viewer and can be a lightweight fit for smaller projects. IntelliJ may suit you better if you're working on large projects, navigating multiple scripts and library, or simply prefer a more structured IDE. It works well offline and does not depend on the SL Viewer for day-to-day scripting work. This plugin has not yet a live synchronization with the Viewer. For now, you can use Firestorm's `#include` and **Recompile** options to compile your scripts in-world. Direct Viewer integration may be added in the future if requested.
+Both editors are great for Second Life scripting; the choice depends on how you like to work. VS Code with the
+[official Second Life extension](https://github.com/secondlife/sl-vscode-plugin) offers a direct connection
+to the Viewer and can be a lightweight fit for smaller projects. IntelliJ with this plugin may suit you better if you're working on large projects, navigating multiple scripts and library, or simply prefer a more structured IDE. It works well offline and does not depend on the SL Viewer for day-to-day scripting work. This plugin has not yet a live synchronization with the Viewer. For now, you can use Firestorm's `#include` and **Recompile** options to compile your scripts in-world. Direct Viewer integration may be added in the future if requested.
 
 ---
 ### How to Install
 
-1. Open your JetBrains IDE such as [IntelliJ IDEA](https://www.jetbrains.com/idea/).
+1. Open your JetBrains IDE such as [IntelliJ IDEA](https://www.jetbrains.com/idea/)..<br><br>
+ 
 2. Install the plugin using your preferred method:
     * **Marketplace (Direct):**
     * [![Get Plugin on JetBrains Marketplace](https://img.shields.io/badge/Get%20Plugin-JetBrains%20Marketplace-000000?style=for-the-badge&logo=jetbrains)](https://plugins.jetbrains.com/plugin/34339)
     * **Manual ZIP:**  
       Go to **Settings** → **Plugins** , click the **⚙️ icon** at top → **Install Plugin from Disk...** to use a
-      downloaded `intellij-lsl.zip` from [GitHub Releases](https://github.com/KoolLSL/intellij-lsl/releases).
+      downloaded `intellij-lsl.zip` from [GitHub Releases](https://github.com/KoolLSL/intellij-lsl/releases).<br><br>
+ 
 3. Complete language setup:
    * **LSL:** works out of the box with no extra setup.
    * **SLua:** the plugin checks for the companion [Luau plugin](https://plugins.jetbrains.com/plugin/24957) and offers a
-     one-click install if needed. It then makes Second Life's SLua definitions available to that companion plugin.
+     one-click install if needed. It then makes Second Life's SLua definitions available to that companion plugin. **Luau** settings should be like:
+    <img src="docs/assets/Luau-settings.png" alt="Luau settings">
+   * The **Plugins** page should show this (LSP4IJ is needed only for IntelliJ Free edition) :<br>
+        <img src="docs/assets/Plugins.png" alt="Luau settings" width="400">
+     <br><br>
 
-4.  Type **LSL** in your IDE **Settings** to quickly access and customize plugin options.
+4. Copy <code>--definitions</code> and <code>--docs</code> full paths from the <b>LSL</b> page. They indicates where the definitions were dowloaded from GitHub:
+    <img src="docs/assets/LSL-settings.png" alt="Luau settings" width="800">
+   <br><br>
+
+5. Paste in <b>Languages &amp; Frameworks &gt; Language Servers</b> &gt;
+    <b>Luau Language Server</b>, for both <b>Server</b> and <b>Installer</b>, the same
+ <code>--definitions</code> (including the <code>:@sl-slua</code> token) and <code>--docs</code> paths indicated on the <b>LSL</b> page: 
+   <img src="docs/assets/Luau-language-server-b.png" alt="Luau settings" width="800">
+   <img src="docs/assets/Luau-language-server.png" alt="Luau settings" width="800">
+   <br><br>
+
+6. Type **LSL** in your IDE **Settings** to customize other plugin options: Code Style, Color Scheme, Inspections, Inlay Hints...<br><br>
 
 
 
@@ -82,42 +136,6 @@ For LSL, you can split your code into reusable files and include them in your sc
 * **`#inline`** — Inlines the function written below directly in the code instead of calling it.
 ---
 
-### Auto-completion
-- **LSL**
-
-  ![LSL auto-completion](docs/assets/IntelliJ-Auto-completion.png)
-
-- **SLua**
-
-  ![SLua auto-completion](docs/assets/SLua-Auto-completion.png)
-
----
-
-### Inspections & Errors
-- **LSL**
-
-  ![LSL inspections and errors](docs/assets/IntelliJ-Errors.png)
-
-- **SLua**
-
-  ![SLua inspections and errors](docs/assets/Slua-Errors.png)
-
----
-
-### Quick Documentation Popup
-- **LSL**
-
-  ![LSL quick documentation popup](docs/assets/IntelliJ-Wiki-popup.png)
-
-- **SLua**
-
-  ![SLua quick documentation popup](docs/assets/SLua-Wiki-popup.png)
-
----
-### Smart Refactor
-![Refactor](docs/assets/IntelliJ-Refactor.png)
-
----
 
 ### Building the plugin (optional)
 
