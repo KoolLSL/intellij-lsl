@@ -9,13 +9,13 @@ editors across Windows, macOS, and Linux.
 
 ### Key Features
 
-* **Project & File Organization:** Manage large multi-file projects using structured project views, shared library, local history, file comparison, GitHub integration, and more.
+* **Project & File Organization:** Manage large multi-file projects using structured project views, shared library, local history, file comparison, GitHub integration, AI chat, and more.
 * **Up-to-date language definitions:** LSL functions, constants, and events, along with SLua definitions and documentation, are downloaded from the official [Second Life language definitions](https://github.com/secondlife/lsl-definitions) project. The plugin checks for updates or can use a custom local folder instead.
 * **Smart Scripting Tools:** Instant syntax highlighting, real-time error checking, smart auto-completion, and safe variable/function refactoring.
 * **Code Formatting & Clean Up:** Automatically format your code, fix indentation, and keep your scripts clean and readable.
 * **Advanced Preprocessor (LSL only):** Use file inclusions (`#include`), function inlining (`#inline`), and conditional blocks (`#ifdef`...) to organize large script projects. SLua uses the `require()` module system instead.
 * **Memory Optimization (LSL only):** Before compiling, built-in constant optimization evaluates static math, replaces fixed variables, and eliminates dead code to help keep scripts within LSL's memory limits. SLua has its own methods.
-* **Push scripts to in-world object:** Explore in-world objects and manually push corresponding scripts via viewer's WebSocket. Your project remains the source of the scripts and is not lost even if in-world objects are deleted.
+* **Push scripts to in-world objects:** Explore in-world objects and push scripts to selected objects through viewer's WebSocket. Your local project remains the master source, so your scripts are preserved even if the in-world objects are deleted. _(Requires Second Life 26.4+. Firestorm coming soon.)_
 
 ### Auto-completion
 - **LSL**
@@ -56,7 +56,7 @@ editors across Windows, macOS, and Linux.
 
 ### IntelliJ vs VS Code
 
-VS Code with the [official Second Life extension](https://github.com/secondlife/sl-vscode-plugin) is great for quickly editing live scripts directly in-world. IntelliJ may suit you better for offline work on larger, structured projects: develop and organize scripts and libraries, then manually push them to their corresponding objects.
+VS Code with the [official Second Life extension](https://github.com/secondlife/sl-vscode-plugin) is great for quickly editing live scripts directly in-world. IntelliJ IDEA with the KoolLSL plugin focuses on larger, long-term offline development workflows: organize scripts and libraries in a structured project, then manually push them to their corresponding in-world objects.
 
 
 ---
@@ -71,10 +71,10 @@ VS Code with the [official Second Life extension](https://github.com/secondlife/
       downloaded `intellij-lsl-version.zip` from [GitHub Releases](https://github.com/KoolLSL/intellij-lsl/releases).<br><br>
 
 3. Go in Settings > Languages &amp; Frameworks > <b>LSL</b>.
-    * **LSL**  language: The Kool plugin works out of the box with no extra setup.
-    * **SLua** language: The Kool plugin needs the companion [Luau plugin](https://plugins.jetbrains.com/plugin/24957) and provides it with  additional Second Life's SLua definitions. Click the link to install it if needed. It will install other required components. 
+    * **LSL**  language: The KoolLSL plugin works out of the box with no extra setup.
+    * **SLua** language: The KoolLSL plugin needs the companion [Luau plugin](https://plugins.jetbrains.com/plugin/24957) and provides it with  additional Second Life's SLua definitions. Click the link to install it if needed. It will install other required components, including `luau-lslp` from Johnny Morganz (the same Luau engine used by the VS Code extension). 
     * The Settings > **Plugins** page should show this (LSP4IJ is only for IntelliJ Free edition):<br>
-         <img src="docs/assets/Plugins.png" alt="Luau settings" width="400">
+         <img src="docs/assets/Plugins.png" alt="Luau settings" width="360">
    <br><br>
 
 4. Go in Settings > Languages &amp; Frameworks > **Luau**, verify language setup:
@@ -113,7 +113,7 @@ VS Code with the [official Second Life extension](https://github.com/secondlife/
 
 ### Push scripts to an in-world object
 
-Viewer push connects IntelliJ to your Second Life Viewer. To get started, enable it under **Settings → Languages & Frameworks → LSL**, then start **Build → Scripts → Script Editor Server** in the viewer. Open the object's **Content** tab and click **Explore in IDE**. In IntelliJ, click the **Viewer** widget in the bottom status bar, or choose **Tools → Second Life**, to open the selector.
+Viewer push connects IntelliJ to your Second Life Viewer. To get started, enable it under Settings > Languages &amp; Frameworks >  **LSL**, then, in SL viewer, start **Build → Scripts → Script Editor Server**. Open the object's **Content** tab and click **Explore in IDE**. In IntelliJ, click the **Viewer** widget in the bottom status bar, or choose **Tools → Second Life**, to open the selector.
 
 Select an object to push its matching scripts, or select individual scripts, then click **Push**. IntelliJ matches scripts by name (without the extension)—for example, `build/Script A.lsl` matches the in-world script `Script A`, and `Script B.luau` matches `Script B`. Matches are searched throughout your project, so unique script names are recommended. IntelliJ only updates scripts that already exist in the object; create a blank script in the viewer first if needed.
 
