@@ -71,11 +71,20 @@ class LslSettingsConfigurable : SearchableConfigurable {
                 checkBox("Constants optimization (LSL)")
                     .bindSelected(settings::optimizeConstants)
                     .comment("""
-                        Inlines constant values and pre-calculates math. Enable for release to reduce scripts memory; disable when debugging.<br>
-                        Example: <code>integer HOUR = 3600; llSetTimer(24 * HOUR);</code><br>
-                        becomes: <code>llSetTimer(86400);</code><br>
-                        
+                        Inlines constant values and pre-calculates math. Enable to reduce scripts memory.<br>
+                        Example: <code>integer HOUR = 3600; llSetTimer(24 * HOUR);</code> becomes: <code>llSetTimer(86400);</code><br>                        
                      """.trimIndent())
+            }
+
+            separator()
+            row {
+                checkBox("Enable Second Life viewer push")
+                    .bindSelected(settings::viewerIntegrationEnabled)
+                    .comment("Connect to the viewer's Script Editor Server and manually push project scripts that match explored object scripts by name.")
+            }
+            row("Viewer WebSocket port:") {
+                intTextField(1..65535)
+                    .bindIntText(settings::viewerWebSocketPort)
             }
 
             separator()
@@ -223,12 +232,12 @@ class LslSettingsConfigurable : SearchableConfigurable {
             row {
                 comment(
                     """
-    This <code>IntelliJ-LSL</code> plugin provides all LSL support directly.
+    This plugin provides all LSL support directly.
     For SLua editing, it integrates with the <code>Luau</code> plugin from Aleksandr Slepchenkov,
     which automatically installs the required components:
     <ul>
     <li><a href="https://github.com/JohnnyMorganz/luau-lsp">luau-lsp</a> from Johnny Morganz
-    (the exact same Luau engine used by Second Life's official VS Code extension).</li>
+    (the same Luau engine used by Second Life's official VS Code extension).</li>
     <li><a href="https://plugins.jetbrains.com/plugin/23257-lsp4ij">LSP4IJ</a> from Red Hat (to enable Language Servers on IntelliJ free edition)</li>
     </ul>
     Once installed, verify in

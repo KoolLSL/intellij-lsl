@@ -15,6 +15,7 @@ editors across Windows, macOS, and Linux.
 * **Code Formatting & Clean Up:** Automatically format your code, fix indentation, and keep your scripts clean and readable.
 * **Advanced Preprocessor (LSL only):** Use file inclusions (`#include`), function inlining (`#inline`), and conditional blocks (`#ifdef`...) to organize large script projects. SLua uses the `require()` module system instead.
 * **Memory Optimization (LSL only):** Before compiling, built-in constant optimization evaluates static math, replaces fixed variables, and eliminates dead code to help keep scripts within LSL's memory limits. SLua has its own methods.
+* **Push scripts to in-world object:** Explore in-world objects and manually push corresponding scripts via viewer's WebSocket. Your project remains the source of the scripts and is not lost even if in-world objects are deleted.
 
 ### Auto-completion
 - **LSL**
@@ -55,37 +56,37 @@ editors across Windows, macOS, and Linux.
 
 ### IntelliJ vs VS Code
 
-Both editors are great for Second Life scripting; the choice depends on how you like to work. VS Code with the
-[official Second Life extension](https://github.com/secondlife/sl-vscode-plugin) offers a direct connection
-to the Viewer and can be a lightweight fit for smaller projects. IntelliJ with this plugin may suit you better if you're working on large projects, navigating multiple scripts and library, or simply prefer a more structured IDE. It works well offline and does not depend on the SL Viewer for day-to-day scripting work. This plugin has not yet a live synchronization with the Viewer. For now, you can use Firestorm's `#include` and **Recompile** options to compile your scripts in-world. Direct Viewer integration may be added in the future if requested.
+VS Code with the [official Second Life extension](https://github.com/secondlife/sl-vscode-plugin) is great for quickly editing live scripts directly in-world. IntelliJ may suit you better for offline work on larger, structured projects: develop and organize scripts and libraries, then manually push them to their corresponding objects.
+
 
 ---
 ### How to Install
 
-1. Open your JetBrains IDE such as [IntelliJ IDEA](https://www.jetbrains.com/idea/)..<br><br>
+1. Open your JetBrains IDE such as [IntelliJ IDEA](https://www.jetbrains.com/idea/).<br><br>
  
 2. Install the plugin using your preferred method:
-    * **Marketplace (Direct):**
     * [![Get Plugin on JetBrains Marketplace](https://img.shields.io/badge/Get%20Plugin-JetBrains%20Marketplace-000000?style=for-the-badge&logo=jetbrains)](https://plugins.jetbrains.com/plugin/34339)
-    * **Manual ZIP:**  
-      Go to **Settings** → **Plugins** , click the **⚙️ icon** at top → **Install Plugin from Disk...** to use a
-      downloaded `intellij-lsl.zip` from [GitHub Releases](https://github.com/KoolLSL/intellij-lsl/releases).<br><br>
- 
-3. Complete language setup:
-   * **LSL:** works out of the box with no extra setup.
-   * **SLua:** the plugin checks for the companion [Luau plugin](https://plugins.jetbrains.com/plugin/24957) and offers a
-     one-click install if needed. It then makes Second Life's SLua definitions available to that companion plugin. **Luau** settings should be like:
-    <img src="docs/assets/Luau-settings.png" alt="Luau settings"><br>
-   * The **Plugins** page should show this (LSP4IJ is needed only for IntelliJ Free edition) :<br>
-        <img src="docs/assets/Plugins.png" alt="Luau settings" width="400">
+    * **From Marketplace**: Settings > Plugins > Marketplace, search for **intellij-lsl** (or "LSL & SLua for Second Life" by Kool) > **Install**.
+    * **From GitHub:**: Settings > Plugins, click the ⚙️ icon at top > **Install Plugin from Disk...** to use a
+      downloaded `intellij-lsl-version.zip` from [GitHub Releases](https://github.com/KoolLSL/intellij-lsl/releases).<br><br>
+
+3. Go in Settings > Languages &amp; Frameworks > <b>LSL</b>.
+    * **LSL**  language: The Kool plugin works out of the box with no extra setup.
+    * **SLua** language: The Kool plugin needs the companion [Luau plugin](https://plugins.jetbrains.com/plugin/24957) and provides it with  additional Second Life's SLua definitions. Click the link to install it if needed. It will install other required components. 
+    * The Settings > **Plugins** page should show this (LSP4IJ is only for IntelliJ Free edition):<br>
+         <img src="docs/assets/Plugins.png" alt="Luau settings" width="400">
+   <br><br>
+
+4. Go in Settings > Languages &amp; Frameworks > **Luau**, verify language setup:
+    <img src="docs/assets/Luau-settings.png" alt="Luau settings">
      <br><br>
 
-4. Copy <code>--definitions</code> and <code>--docs</code> full paths from the <b>LSL</b> page. They indicates where the definitions were dowloaded from GitHub:
+4. From Settings > Languages &amp; Frameworks > **LSL**, copy <code>--definitions</code> and <code>--docs</code> full paths. They indicate where the definitions were downloaded from GitHub:
     <img src="docs/assets/LSL-settings.png" alt="Luau settings" width="800">
    <br><br>
 
-5. Paste in <b>Languages &amp; Frameworks &gt; Language Servers</b> &gt;
-    <b>Luau Language Server</b>, for both <b>Server</b> and <b>Installer</b>, the same
+5. Paste in Settings > Languages &amp; Frameworks > Language Servers > 
+    **Luau Language Server**, for both <b>Server</b> and <b>Installer</b>, the same
  <code>--definitions</code> (including the <code>:@sl-slua</code> token) and <code>--docs</code> paths indicated on the <b>LSL</b> page: 
    <img src="docs/assets/Luau-language-server-b.png" alt="Luau settings" width="800">
    <img src="docs/assets/Luau-language-server.png" alt="Luau settings" width="800">
@@ -93,7 +94,7 @@ to the Viewer and can be a lightweight fit for smaller projects. IntelliJ with t
 
 6. Type **LSL** in your IDE **Settings** to customize other plugin options: Code Style, Color Scheme, Inspections, Inlay Hints...<br><br>
 
-
+---
 
 ### How to Use
 
@@ -105,11 +106,16 @@ to the Viewer and can be a lightweight fit for smaller projects. IntelliJ with t
      `/build` folder (for example, `/build/MyScript.lsl`). Right-click the `.lslp` editor tab and select
      **Open Generated .lsl** to view the output.
    * **SLua:** Select **File → New → Luau File** to create a `.luau` script. There is no separate build step: the `.luau` file is the script you use.
-3. **Use your script in Second Life:** Firestorm users can enable its LSL preprocessor and include the
-   `.lsl` or `.luau` file from disk (for example, `#include "MyProject/build/MyScript.lsl"`), or copy and paste its
-   contents into the in-world editor.
+3. **Use your script in Second Life:** Choose the workflow that suits you:
+   * **Viewer push:** Push project scripts to an in-world explored object, as described below.
+   * **Firestorm:** Use the LSL preprocessor to `#include` your built `.lsl` file (for example, `#include "MyProject/build/MyScript.lsl"`).
+   * **Copy and paste:** Copy the script contents into the in-world editor.
 
+### Push scripts to an in-world object
 
+Viewer push connects IntelliJ to your Second Life Viewer. To get started, enable it under **Settings → Languages & Frameworks → LSL**, then start **Build → Scripts → Script Editor Server** in the viewer. Open the object's **Content** tab and click **Explore in IDE**. In IntelliJ, click the **Viewer** widget in the bottom status bar, or choose **Tools → Second Life**, to open the selector.
+
+Select an object to push its matching scripts, or select individual scripts, then click **Push**. IntelliJ matches scripts by name (without the extension)—for example, `build/Script A.lsl` matches the in-world script `Script A`, and `Script B.luau` matches `Script B`. Matches are searched throughout your project, so unique script names are recommended. IntelliJ only updates scripts that already exist in the object; create a blank script in the viewer first if needed.
 
 ---
 

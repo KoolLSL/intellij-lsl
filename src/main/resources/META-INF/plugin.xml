@@ -14,6 +14,7 @@
   <li><strong>Up-to-date language definitions:</strong> LSL functions, constants, and events, along with SLua definitions and documentation, come from the official <a href="https://github.com/secondlife/lsl-definitions">Second Life language definitions</a> project. The plugin checks for updates or can use a custom definitions folder instead.</li>
   <li><strong>Code Formatting &amp; Clean Up:</strong> Automatically format your code, fix indentation, and keep your scripts clean and readable.</li>
   <li><strong>Smart Scripting Tools:</strong> Instant syntax highlighting, real-time error checking, smart auto-completion, and safe variable/function refactoring.</li>
+  <li><strong>Project-Centric Viewer Push:</strong> Match project scripts to explored in-world objects by name and manually push them through the viewer's WebSocket server. Viewer push is optional and disabled by default.</li>
   <li><strong>Advanced Preprocessor (LSL only):</strong> Use file inclusions (<code>#include</code>), function inlining (<code>#inline</code>), and conditional blocks (<code>#ifdef</code>...) to organize large script projects. SLua uses a module system instead.</li>
   <li><strong>Memory Optimization (LSL only):</strong> Before compiling, built-in constant optimization evaluates static math, replaces fixed variables, and eliminates dead code to help keep scripts within LSL's memory limits. SLua has its own methods.</li>
 </ul>
@@ -65,11 +66,32 @@
             <reference ref="Lsl.OpenProcessedFile"/>
             <separator/>
         </group>
+
+        <group id="Lsl.ViewerIntegration"
+                text="Second Life"
+                popup="true">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+            <action id="Lsl.Viewer.Connect"
+                    class="io.github.koollsl.lsl.viewer.LslViewerConnectionAction"
+                    text="Connect to Viewer"/>
+            <action id="Lsl.Viewer.BrowseObjects"
+                    class="io.github.koollsl.lsl.viewer.LslViewerBrowseObjectsAction"
+                    text="Browse Explored Objects..."/>
+            <action id="Lsl.Viewer.DeployMappedScripts"
+                    class="io.github.koollsl.lsl.viewer.LslViewerDeployAction"
+                    text="Push Scripts..."
+                    description="Match project scripts to an explored viewer object by name and push them"/>
+        </group>
     </actions>
 
     <extensions defaultExtensionNs="com.intellij">
+        <notificationGroup id="LSL Viewer Integration" displayType="BALLOON"/>
+        <statusBarWidgetFactory implementation="io.github.koollsl.lsl.viewer.LslViewerStatusBarWidgetFactory"/>
+
         <!-- Project Services -->
         <projectService serviceImplementation="io.github.koollsl.lsl.preprocessor.LslPreprocessorEngine"/>
+        <projectService serviceImplementation="io.github.koollsl.lsl.viewer.LslViewerConnectionService"/>
+        <projectService serviceImplementation="io.github.koollsl.lsl.viewer.LslProjectDeploymentService"/>
 
         <!-- LSL Language Definitions & Syntax -->
         <fileType

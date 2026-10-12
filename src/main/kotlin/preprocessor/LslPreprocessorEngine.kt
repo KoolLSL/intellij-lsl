@@ -543,15 +543,15 @@ class LslPreprocessorEngine(private val project: Project) {
     }
 
     // Main entry point for processing LSL files on project save
-    fun processFileOnSave(virtualFile: VirtualFile) {
-        if (project.isDisposed || !virtualFile.isValid) return
+    fun processFileOnSave(virtualFile: VirtualFile): VirtualFile? {
+        if (project.isDisposed || !virtualFile.isValid) return null
 
         // 1. Guard against excluded or generated build files in /build/
         val fileIndex = ProjectRootManager.getInstance(project).fileIndex
-        if (fileIndex.isExcluded(virtualFile) || isBuildFile(virtualFile)) return
+        if (fileIndex.isExcluded(virtualFile) || isBuildFile(virtualFile)) return null
 
         // 2. Ensure it's a valid LSL source file (.lsl, .lslp)
-        if (!isLslSource(virtualFile)) return
+        if (!isLslSource(virtualFile)) return null
 
         val documentManager = PsiDocumentManager.getInstance(project)
         val fileDocumentManager = FileDocumentManager.getInstance()
@@ -563,6 +563,7 @@ class LslPreprocessorEngine(private val project: Project) {
         }
 
         // 4. Clean separation between header module (.lslm) and entry point (.lsl / .lslp)
+        var generatedFile: VirtualFile? = null
         if (isHeaderModule(virtualFile)) {
             // MODULE HEADER (.lslm): Refresh itself & recompile dependent root scripts
             virtualFile.refresh(false, false)
@@ -575,13 +576,14 @@ class LslPreprocessorEngine(private val project: Project) {
             }
         } else {
             // ROOT SCRIPT (.lsl or .lslp outside /build/): Compile directly into /build/
-            processLslpFile(virtualFile, project)
+            generatedFile = processLslpFile(virtualFile, project)
         }
 
         // 5. Notify IntelliJ of project-wide PSI/macro updates
         project.messageBus
             .syncPublisher(PsiModificationTracker.TOPIC)
             .modificationCountChanged()
+        return generatedFile
     }
 
     private val INC_START_REGEX = Regex("""^//\s*__LSL_INC_START__:(\d+):(.+)$""")

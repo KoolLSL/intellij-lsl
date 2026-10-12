@@ -15,6 +15,8 @@ class LslSettings : PersistentStateComponent<LslSettings> {
     var indentSize: Int = 4
     var useCustomDefinitionsFolder: Boolean = false
     var customDefinitionsFolder: String = ""
+    var viewerIntegrationEnabled: Boolean = false
+    var viewerWebSocketPort: Int = 9020
 
     var useGithubDefinitions: Boolean
         get() = !useCustomDefinitionsFolder

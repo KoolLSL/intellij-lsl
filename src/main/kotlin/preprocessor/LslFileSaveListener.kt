@@ -17,15 +17,14 @@ import io.github.koollsl.lsl.utils.LslFileTypeUtils
 class LslFileSaveListener(private val project: Project) : FileDocumentManagerListener {
 
     override fun beforeDocumentSaving(document: Document) {
-        val file: VirtualFile = FileDocumentManager.getInstance().getFile(document) ?: return
-        // Ensure it is an LSL source file (checks valid LSL extension & ensures it's NOT a build artifact)
-        if (!LslFileTypeUtils.isLslSource(file)) return
         // Do nothing if file is explicitly excluded in IDE, or not part of THIS project
+        val file: VirtualFile = FileDocumentManager.getInstance().getFile(document) ?: return
         val fileIndex = ProjectRootManager.getInstance(project).fileIndex
         if (fileIndex.isExcluded(file) || !fileIndex.isInContent(file)) {
             return
         }
 
+        if (!LslFileTypeUtils.isLslSource(file)) return
         ApplicationManager.getApplication().invokeLater {
             if (!project.isDisposed) {
                 WriteCommandAction.runWriteCommandAction(project, "LSL Preprocess File", null, Runnable {
@@ -38,4 +37,3 @@ class LslFileSaveListener(private val project: Project) : FileDocumentManagerLis
         }
     }
 }
-
