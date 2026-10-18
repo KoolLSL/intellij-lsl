@@ -1,7 +1,7 @@
 package io.github.koollsl.lsl.syntax
 
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
-import io.github.koollsl.lsl.LslLanguage
+import LslLanguage
 
 class LslHighlightingAndColorSettingsTest : BasePlatformTestCase() {
 

@@ -2,31 +2,19 @@ package io.github.koollsl.lsl.safeguards
 
 import com.intellij.testFramework.LightVirtualFile
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
+import io.github.koollsl.lsl.utils.LslFileTypeUtils
 
 class LslBuildOutputSafeguardsTest : BasePlatformTestCase() {
 
-    fun testIsGeneratedBuildLslFile() {
+    fun testIsBuildFile() {
         val buildFile = LightVirtualFile("build/output.lsl", "default { state_entry() {} }")
-        val outFile = LightVirtualFile("out/compiled.lsl", "default { state_entry() {} }")
-        val outputDirFile = LightVirtualFile("output/script.lsl", "default { state_entry() {} }")
-        val distFile = LightVirtualFile("dist/script.lsl", "default { state_entry() {} }")
+        val nestedBuildFile = LightVirtualFile("src/build/output.lsl", "default { state_entry() {} }")
         val srcFile = LightVirtualFile("src/main.lsl", "default { state_entry() {} }")
-        val lslpFile = LightVirtualFile("build/script.lslp", "default { state_entry() {} }")
-        val lslmFile = LightVirtualFile("out/lib.lslm", "default { state_entry() {} }")
 
-        assertTrue(LslBuildOutputNotificationProvider.isGeneratedBuildFile(buildFile))
-        assertTrue(LslBuildOutputNotificationProvider.isGeneratedBuildFile(outFile))
-        assertTrue(LslBuildOutputNotificationProvider.isGeneratedBuildFile(outputDirFile))
-        assertTrue(LslBuildOutputNotificationProvider.isGeneratedBuildFile(distFile))
-        assertTrue(LslBuildOutputNotificationProvider.isGeneratedBuildFile(lslpFile))
-        assertTrue(LslBuildOutputNotificationProvider.isGeneratedBuildFile(lslmFile))
-
-        assertFalse(LslBuildOutputNotificationProvider.isGeneratedBuildFile(srcFile))
-        assertFalse(LslBuildOutputNotificationProvider.isGeneratedBuildFile(null))
-
-        assertTrue(LslBuildOutputNotificationProvider.isGeneratedBuildLslFile(buildFile))
-        assertTrue(LslBuildOutputNotificationProvider.isGeneratedBuildLslFile(lslpFile))
-        assertFalse(LslBuildOutputNotificationProvider.isGeneratedBuildLslFile(srcFile))
+        assertTrue(LslFileTypeUtils.isBuildFile(buildFile))
+        assertTrue(LslFileTypeUtils.isBuildFile(nestedBuildFile))
+        assertFalse(LslFileTypeUtils.isBuildFile(srcFile))
+        assertFalse(LslFileTypeUtils.isBuildFile(null))
     }
 
     fun testWritingAccessProvider() {

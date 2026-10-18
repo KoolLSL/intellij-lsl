@@ -5,6 +5,7 @@ import com.intellij.openapi.components.service
 import com.intellij.openapi.util.TextRange
 import com.intellij.psi.*
 import com.intellij.psi.impl.source.resolve.ResolveCache
+import com.intellij.util.IncorrectOperationException
 import io.github.koollsl.lsl.preprocessor.LslPreprocessorEngine
 import io.github.koollsl.lsl.psi.*
 
@@ -32,6 +33,12 @@ class LslLValueReference(val element: LslLValue) :
 
     override fun getRangeInElement(): TextRange =
         element.variableNameIdentifier?.textRangeInParent ?: TextRange.EMPTY_RANGE
+
+    override fun handleElementRename(newElementName: String): PsiElement {
+        val identifier = element.variableNameIdentifier
+            ?: throw IncorrectOperationException("LslLValue has no variable name identifier")
+        return identifier.replace(LslElementFactory.createIdentifier(element.project, newElementName))
+    }
 
     private fun resolveInner(): Array<ResolveResult> {
         if (engine.isElementDisabled(element)) {

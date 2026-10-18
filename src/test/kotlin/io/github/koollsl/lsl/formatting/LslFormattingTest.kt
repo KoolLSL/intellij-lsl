@@ -3,6 +3,7 @@ package io.github.koollsl.lsl.formatting
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.psi.codeStyle.CodeStyleManager
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
+import LslLanguage
 
 class LslFormattingTest : BasePlatformTestCase() {
 
@@ -157,9 +158,9 @@ default
 {
     state_entry()
     {
-#ifdef DEBUG
+        #ifdef DEBUG
         llOwnerSay("debug");
-#endif
+        #endif
         llSay(0, "done");
     }
 }
@@ -250,6 +251,41 @@ default
         )
     }
 
+    fun testCommentBeforeElseAlignment() {
+        doTest(
+            """
+default{
+state_entry(){
+if(1){
+llSay(0,"true");
+}
+// Otherwise
+else{
+llSay(0,"false");
+}
+}
+}
+            """,
+            """
+default
+{
+    state_entry()
+    {
+        if (1)
+        {
+            llSay(0, "true");
+        }
+        // Otherwise
+        else
+        {
+            llSay(0, "false");
+        }
+    }
+}
+            """
+        )
+    }
+
     fun testForLoopVariants() {
         doTest(
             """
@@ -292,7 +328,7 @@ default
 
     fun testInlineBracesWhenConfigured() {
         val commonSettings = com.intellij.psi.codeStyle.CodeStyleSettingsManager.getSettings(project)
-            .getCommonSettings(io.github.koollsl.lsl.LslLanguage.INSTANCE)
+            .getCommonSettings(LslLanguage.INSTANCE)
         val oldClassBrace = commonSettings.CLASS_BRACE_STYLE
         val oldMethodBrace = commonSettings.METHOD_BRACE_STYLE
         val oldBlockBrace = commonSettings.BRACE_STYLE

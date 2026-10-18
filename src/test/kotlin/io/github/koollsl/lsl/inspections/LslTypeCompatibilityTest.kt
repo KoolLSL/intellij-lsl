@@ -61,12 +61,15 @@ default {
         val manager = InspectionManager.getInstance(project)
 
         val assignmentProblems = LslInvalidAssignmentTypeInspection().checkFile(file, manager, false)
-        assertEquals(0, assignmentProblems.size)
+        assertNotNull(assignmentProblems)
+        assertEquals(0, assignmentProblems!!.size)
 
         val returnProblems = LslInvalidReturnTypeInspection().checkFile(file, manager, false)
-        assertEquals(0, returnProblems.size)
+        assertNotNull(returnProblems)
+        assertEquals(0, returnProblems!!.size)
 
         val callProblems = LslInvalidFunctionCallArgumentInspection().checkFile(file, manager, false)
-        assertEquals(0, callProblems.size)
+        assertNotNull(callProblems)
+        assertEquals(0, callProblems!!.size)
     }
 }

@@ -3,6 +3,10 @@ package io.github.koollsl.lsl.preprocessor
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 
 class LslDeadCodeEliminationTest : BasePlatformTestCase() {
+    private val preprocessor get() = LslPreprocessorEngine(project)
+
+    private fun eliminateDeadCode(code: String): String =
+        preprocessor.preprocessFile(myFixture.configureByText("test.lslp", code))
 
     fun testStripUnusedLocalGlobalsAndFunctions() {
         val code = """
@@ -25,7 +29,7 @@ default {
 }
         """.trimIndent()
 
-        val result = LslPreprocessorEngine.eliminateDeadCode(project, code)
+        val result = eliminateDeadCode(code)
         assertTrue(result.contains("usedVar"))
         assertTrue(result.contains("usedFunc"))
         assertTrue(result.contains("state_entry"))
@@ -57,7 +61,7 @@ default {
 }
         """.trimIndent()
 
-        val result = LslPreprocessorEngine.eliminateDeadCode(project, code)
+        val result = eliminateDeadCode(code)
         assertTrue(result.contains("depGlobal"))
         assertTrue(result.contains("leafFunc"))
         assertTrue(result.contains("intermediateFunc"))
@@ -77,7 +81,7 @@ default {
 }
         """.trimIndent()
 
-        val result = LslPreprocessorEngine.eliminateDeadCode(project, code)
+        val result = eliminateDeadCode(code)
         assertFalse(result.contains("integer shadowedGlobal = 50;"))
     }
 
@@ -94,7 +98,7 @@ default {
 }
         """.trimIndent()
 
-        val result = LslPreprocessorEngine.eliminateDeadCode(project, code)
+        val result = eliminateDeadCode(code)
         assertTrue(result.contains("baseVar"))
         assertTrue(result.contains("derivedVar"))
         assertFalse(result.contains("unusedVar"))
@@ -124,7 +128,7 @@ state running {
 }
         """.trimIndent()
 
-        val result = LslPreprocessorEngine.eliminateDeadCode(project, code)
+        val result = eliminateDeadCode(code)
         assertTrue(result.contains("state1Var"))
         assertTrue(result.contains("state2Var"))
         assertTrue(result.contains("funcForState2"))
@@ -164,7 +168,7 @@ default {
             """.trimIndent()
         )
 
-        val result = LslPreprocessorEngine.preprocessFile(mainFile)
+        val result = preprocessor.preprocessFile(mainFile)
         assertFalse(result.contains("integer LIB_UNUSED"))
         assertFalse(result.contains("integer LIB_USED"))
         assertFalse(result.contains("integer MAIN_VAR"))
@@ -203,7 +207,7 @@ state customState {
 }
         """.trimIndent()
 
-        val result = LslPreprocessorEngine.eliminateDeadCode(project, code)
+        val result = eliminateDeadCode(code)
         assertTrue(result.contains("reachableVarDefault"))
         assertTrue(result.contains("reachableVarCustom"))
         assertTrue(result.contains("reachableFuncCustom"))
@@ -231,7 +235,7 @@ default {
             """.trimIndent()
         )
 
-        LslPreprocessorEngine.processFileOnSave(lslpFile.virtualFile, project)
+        preprocessor.processFileOnSave(lslpFile.virtualFile)
 
         val parentDir = lslpFile.virtualFile.parent
         val buildDir = parentDir.findChild("build")
@@ -271,7 +275,7 @@ default {
             """.trimIndent()
         )
 
-        LslPreprocessorEngine.processFileOnSave(lslmFile.virtualFile, project)
+        preprocessor.processFileOnSave(lslmFile.virtualFile)
 
         val parentDir = lslmFile.virtualFile.parent
         val buildDir = parentDir.findChild("build")
@@ -308,7 +312,7 @@ default {
             """.trimIndent()
         )
 
-        LslPreprocessorEngine.processFileOnSave(lslpFile.virtualFile, project)
+        preprocessor.processFileOnSave(lslpFile.virtualFile)
 
         val parentDir = lslpFile.virtualFile.parent
         val buildDir = parentDir.findChild("build")
@@ -356,7 +360,7 @@ default {
 }
         """.trimIndent()
 
-        val result = LslPreprocessorEngine.eliminateDeadCode(project, code)
+        val result = eliminateDeadCode(code)
         assertTrue(result.contains("timerVar"))
         assertTrue(result.contains("touchVar"))
         assertTrue(result.contains("linkVar"))
@@ -396,7 +400,7 @@ default {
             """.trimIndent()
         )
 
-        val resultFile = LslPreprocessorEngine.processLslpFile(lslpFile.virtualFile, project)
+        val resultFile = preprocessor.processLslpFile(lslpFile.virtualFile, project)
         assertNotNull(resultFile)
 
         val outputText = String(resultFile!!.contentsToByteArray())
@@ -451,7 +455,7 @@ default
             """.trimIndent()
         )
 
-        val resultFile = LslPreprocessorEngine.processLslpFile(lslpFile.virtualFile, project)
+        val resultFile = preprocessor.processLslpFile(lslpFile.virtualFile, project)
         assertNotNull(resultFile)
 
         val outputText = String(resultFile!!.contentsToByteArray())
@@ -517,7 +521,7 @@ default {
             """.trimIndent()
         )
 
-        val resultFile = LslPreprocessorEngine.processLslpFile(mainFile.virtualFile, project)
+        val resultFile = preprocessor.processLslpFile(mainFile.virtualFile, project)
         assertNotNull(resultFile)
 
         val outputText = String(resultFile!!.contentsToByteArray())
@@ -613,7 +617,7 @@ default {
             """.trimIndent()
         )
 
-        val resultFile = LslPreprocessorEngine.processLslpFile(mainFile.virtualFile, project)
+        val resultFile = preprocessor.processLslpFile(mainFile.virtualFile, project)
         assertNotNull(resultFile)
 
         val outputText = String(resultFile!!.contentsToByteArray())

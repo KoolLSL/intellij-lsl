@@ -3,6 +3,7 @@ package io.github.koollsl.lsl.preprocessor
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 
 class LslInliningTest : BasePlatformTestCase() {
+    private val preprocessor get() = LslPreprocessorEngine(project)
 
     fun testGlobalVariableInlining() {
         val code = """
@@ -18,7 +19,7 @@ default {
         """.trimIndent()
 
         val psiFile = myFixture.configureByText("test.lslp", code)
-        val result = LslPreprocessorEngine.preprocessFile(psiFile)
+        val result = preprocessor.preprocessFile(psiFile)
 
         assertFalse("Inlined global PREFIX should not be declared", result.contains("string PREFIX ="))
         assertFalse("Inlined global TIMEOUT should not be declared", result.contains("integer TIMEOUT ="))
@@ -39,7 +40,7 @@ default {
         """.trimIndent()
 
         val psiFile = myFixture.configureByText("test.lslp", code)
-        val result = LslPreprocessorEngine.preprocessFile(psiFile)
+        val result = preprocessor.preprocessFile(psiFile)
 
         assertFalse("Inlined global VALUE definition should be stripped", result.contains("integer VALUE = 100;"))
         assertTrue("Local VALUE definition should be kept", result.contains("integer VALUE = 5;"))
@@ -62,7 +63,7 @@ default {
         """.trimIndent()
 
         val psiFile = myFixture.configureByText("test.lslp", code)
-        val result = LslPreprocessorEngine.preprocessFile(psiFile)
+        val result = preprocessor.preprocessFile(psiFile)
 
         assertFalse("Function declaration should not be emitted", result.contains("integer add("))
         assertTrue("Single expression call should expand and fold directly", result.contains("integer x = 3;"))
@@ -83,7 +84,7 @@ default {
         """.trimIndent()
 
         val psiFile = myFixture.configureByText("test.lslp", code)
-        val result = LslPreprocessorEngine.preprocessFile(psiFile)
+        val result = preprocessor.preprocessFile(psiFile)
 
         assertFalse(result.contains("integer multiply("))
         assertFalse(result.contains("string TAG ="))
@@ -113,7 +114,7 @@ default {
         """.trimIndent()
 
         val psiFile = myFixture.configureByText("test.lslp", code)
-        val result = LslPreprocessorEngine.preprocessFile(psiFile)
+        val result = preprocessor.preprocessFile(psiFile)
 
         assertFalse("Function computeSum should not be declared", result.contains("integer computeSum("))
         assertTrue("Parameter n should be renamed uniquely", result.contains("_i1_n"))
@@ -139,7 +140,7 @@ default {
         """.trimIndent()
 
         val psiFile = myFixture.configureByText("test.lslp", code)
-        val result = LslPreprocessorEngine.preprocessFile(psiFile)
+        val result = preprocessor.preprocessFile(psiFile)
 
         assertTrue(result.contains("_i1_x"))
         assertTrue(result.contains("_i1_temp"))
@@ -162,7 +163,7 @@ default {
         """.trimIndent()
 
         val psiFile = myFixture.configureByText("test.lslp", code)
-        val result = LslPreprocessorEngine.preprocessFile(psiFile)
+        val result = preprocessor.preprocessFile(psiFile)
 
         assertFalse(result.contains("logMessage(string"))
         assertTrue(result.contains("_i1_prefix = \"WARN\";"))
@@ -189,7 +190,7 @@ default {
         """.trimIndent()
 
         val psiFile = myFixture.configureByText("test.lslp", code)
-        val result = LslPreprocessorEngine.preprocessFile(psiFile)
+        val result = preprocessor.preprocessFile(psiFile)
 
         assertTrue("Recursive function should be kept as standard function", result.contains("integer factorial(integer n)"))
         assertTrue("Call to factorial should remain intact", result.contains("factorial(5)"))
@@ -215,7 +216,7 @@ default {
         """.trimIndent()
 
         val psiFile = myFixture.configureByText("test.lslp", code)
-        val result = LslPreprocessorEngine.preprocessFile(psiFile)
+        val result = preprocessor.preprocessFile(psiFile)
 
         assertTrue("Mutual recursive funcA should be retained", result.contains("integer funcA("))
         assertTrue("Mutual recursive funcB should be retained", result.contains("integer funcB("))
@@ -242,7 +243,7 @@ default {
         """.trimIndent()
 
         val psiFile = myFixture.configureByText("main.lslp", mainCode)
-        val result = LslPreprocessorEngine.preprocessFile(psiFile)
+        val result = preprocessor.preprocessFile(psiFile)
 
         assertFalse("square function should not be declared", result.contains("integer square("))
         assertFalse("MODULE_NAME should not be declared", result.contains("string MODULE_NAME ="))
@@ -270,7 +271,7 @@ default {
         """.trimIndent()
 
         val psiFile = myFixture.configureByText("test.lslp", code)
-        val result = LslPreprocessorEngine.preprocessFile(psiFile)
+        val result = preprocessor.preprocessFile(psiFile)
 
         assertFalse(result.contains("TAG ="))
         assertFalse(result.contains("square("))
@@ -297,7 +298,7 @@ default {
         """.trimIndent()
 
         val psiFile = myFixture.configureByText("test.lslp", code)
-        val result = LslPreprocessorEngine.preprocessFile(psiFile)
+        val result = preprocessor.preprocessFile(psiFile)
 
         assertFalse(result.contains("integer maxVal("))
         assertTrue(result.contains("_i1_a = 10;"))
@@ -321,7 +322,7 @@ default {
         """.trimIndent()
 
         val psiFile = myFixture.configureByText("test.lslp", code)
-        val result = LslPreprocessorEngine.preprocessFile(psiFile)
+        val result = preprocessor.preprocessFile(psiFile)
 
         assertFalse(result.contains("vector OFFSET ="))
         assertTrue(result.contains("vector v = <1.0, 2.0, 3.0>;"))
@@ -351,7 +352,7 @@ default {
         """.trimIndent()
 
         val psiFile = myFixture.configureByText("test.lslp", code)
-        val result = LslPreprocessorEngine.preprocessFile(psiFile)
+        val result = preprocessor.preprocessFile(psiFile)
 
         assertFalse("inlinedHelper should not be emitted", result.contains("integer inlinedHelper("))
         assertTrue("normalHelper should be retained because it is used", result.contains("integer normalHelper(integer a)"))

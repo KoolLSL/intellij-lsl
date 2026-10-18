@@ -1,7 +1,7 @@
 package io.github.koollsl.lsl.structure
 
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
-import io.github.koollsl.lsl.LslIcons
+import LslIcons
 import io.github.koollsl.lsl.psi.*
 
 class LslStructureViewTest : BasePlatformTestCase() {
@@ -29,7 +29,7 @@ state otherState {
 
         val rootElement = LslStructureViewElement(file)
         assertEquals("TestScript.lsl", rootElement.presentation.presentableText)
-        assertEquals(LslIcons.FILE, rootElement.presentation.getIcon(false))
+        assertEquals(LslIcons.FILE_LSL, rootElement.presentation.getIcon(false))
 
         val children = rootElement.children
         assertEquals(4, children.size)

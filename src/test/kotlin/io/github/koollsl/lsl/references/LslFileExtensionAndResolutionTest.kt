@@ -1,13 +1,18 @@
 package io.github.koollsl.lsl.references
 
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
-import io.github.koollsl.lsl.LslFileType
+import KwdbData
+import LslFileType
+import io.github.koollsl.lsl.preprocessor.LslPreprocessorEngine
+import io.github.koollsl.lsl.preprocessor.LslIncludesCollector
 import io.github.koollsl.lsl.psi.LslExpressionFunctionCall
 import io.github.koollsl.lsl.psi.LslFunction
 import io.github.koollsl.lsl.psi.LslGlobalVariable
 import io.github.koollsl.lsl.psi.LslLValue
+import io.github.koollsl.lsl.psi.LslStatementVariable
 
 class LslFileExtensionAndResolutionTest : BasePlatformTestCase() {
+    private val preprocessor get() = LslPreprocessorEngine(project)
 
     fun testDefaultFileExtensionIsLslp() {
         assertEquals("lslp", LslFileType.INSTANCE.defaultExtension)
@@ -109,8 +114,59 @@ default {
         assertEquals("CONFIG_PREFIX", (resolvedPrefix as LslGlobalVariable).name)
     }
 
+    fun testRenameGlobalVariableUpdatesUsages() {
+        val file = myFixture.configureByText(
+            "RenameVariable.lslp",
+            """
+integer last_broadcast_time = 0;
+
+default {
+    state_entry() {
+        last_broadcast_time = 1;
+    }
+}
+            """.trimIndent()
+        )
+        val declaration = com.intellij.psi.util.PsiTreeUtil.findChildOfType(
+            file,
+            LslGlobalVariable::class.java
+        )
+        assertNotNull(declaration)
+
+        myFixture.renameElement(declaration!!, "LastRelist")
+
+        assertTrue(file.text.contains("integer LastRelist = 0;"))
+        assertTrue(file.text.contains("LastRelist = 1;"))
+        assertFalse(file.text.contains("last_broadcast_time"))
+    }
+
+    fun testRenameLocalVariableUpdatesUsages() {
+        val file = myFixture.configureByText(
+            "RenameLocalVariable.lslp",
+            """
+default {
+    state_entry() {
+        integer oldName = 0;
+        oldName = 1;
+    }
+}
+            """.trimIndent()
+        )
+        val declaration = com.intellij.psi.util.PsiTreeUtil.findChildOfType(
+            file,
+            LslStatementVariable::class.java
+        )
+        assertNotNull(declaration)
+
+        myFixture.renameElement(declaration!!, "newName")
+
+        assertTrue(file.text.contains("integer newName = 0;"))
+        assertTrue(file.text.contains("newName = 1;"))
+        assertFalse(file.text.contains("oldName"))
+    }
+
     fun testKwdbBuiltinsLoaded() {
-        val kwdb = io.github.koollsl.lsl.KwdbData.getInstance(project)
+        val kwdb = KwdbData.getInstance(project)
         assertNotNull(kwdb.constants["NAK"])
         assertNotNull(kwdb.constants["EOF"])
         assertNotNull(kwdb.functions["llSay"])
@@ -165,7 +221,7 @@ default {
             """.trimIndent()
         )
 
-        val included = io.github.koollsl.lsl.preprocessor.LslPreprocessorEngine.getIncludedFiles(mainFile)
+        val included = LslIncludesCollector.getInstance(project).getIncludedFiles(mainFile)
         val includedNames = included.map { it.name }.toSet()
 
         assertTrue(includedNames.contains("HeaderA.lslm"))
@@ -201,7 +257,7 @@ default {
             """.trimIndent()
         )
 
-        val included = io.github.koollsl.lsl.preprocessor.LslPreprocessorEngine.getIncludedFiles(mainFile)
+        val included = LslIncludesCollector.getInstance(project).getIncludedFiles(mainFile)
         val includedNames = included.map { it.name }.toSet()
 
         assertTrue(includedNames.contains("CycleA.lslm"))
@@ -254,7 +310,7 @@ default {
             """.trimIndent()
         )
 
-        val output = io.github.koollsl.lsl.preprocessor.LslPreprocessorEngine.preprocessFile(mainFile)
+        val output = preprocessor.preprocessFile(mainFile)
         assertTrue(output.contains("bufferFunc"))
         assertTrue(output.contains("Begin Include: BufferHeader.lslm"))
     }

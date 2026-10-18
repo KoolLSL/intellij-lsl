@@ -47,7 +47,8 @@ integer duplicateVar = 2;
         val manager = InspectionManager.getInstance(project)
         val problems = inspection.checkFile(file, manager, false)
 
-        assertEquals(0, problems.size)
+        assertNotNull(problems)
+        assertEquals(0, problems!!.size)
     }
 
     fun testRedeclaredIdentifierInspectionCatchesRealDuplicates() {
@@ -63,6 +64,7 @@ integer duplicateVar = 2;
         val manager = InspectionManager.getInstance(project)
         val problems = inspection.checkFile(file, manager, false)
 
-        assertEquals(1, problems.size)
+        assertNotNull(problems)
+        assertEquals(1, problems!!.size)
     }
 }

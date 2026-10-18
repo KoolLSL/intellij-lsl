@@ -27,19 +27,8 @@ dependencies {
     antlr("org.antlr:antlr4:4.11.1")
     implementation("org.antlr:antlr4-runtime:4.11.1")
 
-    // JUnit 4 dependency for IntelliJ test framework support
-    //testImplementation("junit:junit:4.13.2")
-    // OpenTest4J required by IntelliJ 2024.3 BasePlatformTestCase
-    //testRuntimeOnly("org.opentest4j:opentest4j:1.3.0")
-}
-
-// Disable test compiling
-sourceSets {
-    test {
-        java.setSrcDirs(emptyList<String>())
-        resources.setSrcDirs(emptyList<String>())
-        kotlin.setSrcDirs(emptyList<String>())
-    }
+    testImplementation("junit:junit:4.13.2")
+    testRuntimeOnly("org.opentest4j:opentest4j:1.3.0")
 }
 
 tasks.generateGrammarSource {

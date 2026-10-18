@@ -3,6 +3,7 @@ package io.github.koollsl.lsl.preprocessor
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 
 class LslConstantFoldingTest : BasePlatformTestCase() {
+    private val preprocessor get() = LslPreprocessorEngine(project)
 
     fun testBitwiseMaskConstantFoldingAndPropagation() {
         val code = """
@@ -25,7 +26,7 @@ default {
         """.trimIndent()
 
         val psiFile = myFixture.configureByText("test.lslp", code)
-        val result = LslPreprocessorEngine.preprocessFile(psiFile)
+        val result = preprocessor.preprocessFile(psiFile)
 
         assertFalse("BIT8 declaration should be removed by DCE", result.contains("integer BIT8"))
         assertFalse("BIT9 declaration should be removed by DCE", result.contains("integer BIT9"))
@@ -60,7 +61,7 @@ default {
         """.trimIndent()
 
         val psiFile = myFixture.configureByText("test.lslp", code)
-        val result = LslPreprocessorEngine.preprocessFile(psiFile)
+        val result = preprocessor.preprocessFile(psiFile)
 
         assertFalse(result.contains("integer CONST_X"))
         assertFalse(result.contains("integer CONST_Y"))
@@ -89,7 +90,7 @@ default {
         """.trimIndent()
 
         val psiFile = myFixture.configureByText("test.lslp", code)
-        val result = LslPreprocessorEngine.preprocessFile(psiFile)
+        val result = preprocessor.preprocessFile(psiFile)
 
         assertFalse(result.contains("integer CONST_A"))
         assertFalse(result.contains("integer CONST_B"))
@@ -111,7 +112,7 @@ default {
         """.trimIndent()
 
         val psiFile = myFixture.configureByText("test.lslp", code)
-        val result = LslPreprocessorEngine.preprocessFile(psiFile)
+        val result = preprocessor.preprocessFile(psiFile)
 
         assertFalse("constVar should be folded and removed", result.contains("integer constVar"))
         assertTrue("mutatedVar must be preserved as global variable", result.contains("integer mutatedVar = 200;"))
@@ -135,7 +136,7 @@ default {
         """.trimIndent()
 
         val psiFile = myFixture.configureByText("test.lslp", code)
-        val result = LslPreprocessorEngine.preprocessFile(psiFile)
+        val result = preprocessor.preprocessFile(psiFile)
 
         assertFalse("staticVal should be removed", result.contains("integer staticVal"))
         assertTrue("counterA must remain global", result.contains("integer counterA = 0;"))
@@ -160,7 +161,7 @@ default {
         """.trimIndent()
 
         val psiFile = myFixture.configureByText("test.lslp", code)
-        val result = LslPreprocessorEngine.preprocessFile(psiFile)
+        val result = preprocessor.preprocessFile(psiFile)
 
         assertFalse("GLOBAL_VAL declaration should be removed by DCE", result.contains("integer GLOBAL_VAL = 42;"))
         assertTrue("Local shadowed variable must be preserved", result.contains("integer GLOBAL_VAL = 99;"))
@@ -198,7 +199,7 @@ default {
             """.trimIndent()
         )
 
-        val resultFile = LslPreprocessorEngine.processLslpFile(mainFile.virtualFile, mainFile.project)
+        val resultFile = preprocessor.processLslpFile(mainFile.virtualFile, mainFile.project)
         assertNotNull(resultFile)
 
         val outputText = String(resultFile!!.contentsToByteArray())
@@ -227,7 +228,7 @@ default {
         """.trimIndent()
 
         val psiFile = myFixture.configureByText("test.lslp", code)
-        val result = LslPreprocessorEngine.preprocessFile(psiFile)
+        val result = preprocessor.preprocessFile(psiFile)
 
         assertFalse("CHANNEL declaration should be removed by DCE", result.contains("integer CHANNEL"))
         assertFalse("OFFSET declaration should be removed by DCE", result.contains("integer OFFSET"))
@@ -251,7 +252,7 @@ default {
         """.trimIndent()
 
         val psiFile = myFixture.configureByText("test.lslp", code)
-        val result = LslPreprocessorEngine.preprocessFile(psiFile)
+        val result = preprocessor.preprocessFile(psiFile)
 
         assertFalse("NEG_F declaration should be removed by DCE", result.contains("float NEG_F"))
         assertFalse("NEG_F2 declaration should be removed by DCE", result.contains("float NEG_F2"))
@@ -273,7 +274,7 @@ default {
         """.trimIndent()
 
         val psiFile = myFixture.configureByText("test.lslp", code)
-        val result = LslPreprocessorEngine.preprocessFile(psiFile)
+        val result = preprocessor.preprocessFile(psiFile)
 
         assertFalse("VEC_CONST declaration should be removed by DCE", result.contains("vector VEC_CONST"))
         assertTrue("v should be replaced with <-1.0, 2.0, -3.5>", result.contains("vector v = <-1.0, 2.0, -3.5>;"))
@@ -295,7 +296,7 @@ default {
         """.trimIndent()
 
         val psiFile = myFixture.configureByText("test.lslp", code)
-        val result = LslPreprocessorEngine.preprocessFile(psiFile)
+        val result = preprocessor.preprocessFile(psiFile)
 
         assertFalse("ROT_CONST declaration should be removed by DCE", result.contains("rotation ROT_CONST"))
         assertTrue("r should be replaced with <0.0, 0.0, -0.707107, 0.707107>", result.contains("rotation r = <0.0, 0.0, -0.707107, 0.707107>;"))
@@ -316,7 +317,7 @@ default {
         """.trimIndent()
 
         val psiFile = myFixture.configureByText("test.lslp", code)
-        val result = LslPreprocessorEngine.preprocessFile(psiFile)
+        val result = preprocessor.preprocessFile(psiFile)
 
         assertFalse("LIST_CONST declaration should be removed by DCE", result.contains("list LIST_CONST"))
         assertTrue("l should be replaced with formatted list", result.contains("list l = [-100, -2.5, \"test\", <-1.0, 2.0, -3.0>];"))
@@ -325,33 +326,33 @@ default {
 
     fun testEvaluateConstantExprAndElementFactoryDirectly() {
         val exprInt = io.github.koollsl.lsl.psi.LslElementFactory.createExpression(project, "-1000")
-        val valInt = LslPreprocessorEngine.evaluateConstantExpression(exprInt)
+        val valInt = preprocessor.evaluateConstantExpression(exprInt)
         assertTrue(valInt is LslPreprocessorEngine.ConstantValue.IntVal)
         assertEquals(-1000, (valInt as LslPreprocessorEngine.ConstantValue.IntVal).value)
         assertEquals("-1000", valInt.toLiteralString())
 
         val exprFloat = io.github.koollsl.lsl.psi.LslElementFactory.createExpression(project, "-2.5")
-        val valFloat = LslPreprocessorEngine.evaluateConstantExpression(exprFloat)
+        val valFloat = preprocessor.evaluateConstantExpression(exprFloat)
         assertTrue(valFloat is LslPreprocessorEngine.ConstantValue.FloatVal)
         assertEquals(-2.5f, (valFloat as LslPreprocessorEngine.ConstantValue.FloatVal).value, 0.0001f)
         assertEquals("-2.5", valFloat.toLiteralString())
 
         val exprVec = io.github.koollsl.lsl.psi.LslElementFactory.createExpression(project, "<-1.0, 2.0, -3.0>")
-        val valVec = LslPreprocessorEngine.evaluateConstantExpression(exprVec)
+        val valVec = preprocessor.evaluateConstantExpression(exprVec)
         assertTrue(valVec is LslPreprocessorEngine.ConstantValue.VectorVal)
         assertEquals("<-1.0, 2.0, -3.0>", valVec?.toLiteralString())
         val parsedVecExpr = io.github.koollsl.lsl.psi.LslElementFactory.createExpression(project, valVec!!.toLiteralString())
         assertNotNull(parsedVecExpr)
 
         val exprRot = io.github.koollsl.lsl.psi.LslElementFactory.createExpression(project, "<0.0, -0.5, 0.0, -0.866>")
-        val valRot = LslPreprocessorEngine.evaluateConstantExpression(exprRot)
+        val valRot = preprocessor.evaluateConstantExpression(exprRot)
         assertTrue(valRot is LslPreprocessorEngine.ConstantValue.RotationVal)
         assertEquals("<0.0, -0.5, 0.0, -0.866>", valRot?.toLiteralString())
         val parsedRotExpr = io.github.koollsl.lsl.psi.LslElementFactory.createExpression(project, valRot!!.toLiteralString())
         assertNotNull(parsedRotExpr)
 
         val exprList = io.github.koollsl.lsl.psi.LslElementFactory.createExpression(project, "[-100, -2.5, <-1.0, 2.0, -3.0>]")
-        val valList = LslPreprocessorEngine.evaluateConstantExpression(exprList)
+        val valList = preprocessor.evaluateConstantExpression(exprList)
         assertTrue(valList is LslPreprocessorEngine.ConstantValue.ListVal)
         assertEquals("[-100, -2.5, <-1.0, 2.0, -3.0>]", valList?.toLiteralString())
         val parsedListExpr = io.github.koollsl.lsl.psi.LslElementFactory.createExpression(project, valList!!.toLiteralString())

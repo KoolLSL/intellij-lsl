@@ -1,134 +1,122 @@
 package io.github.koollsl.lsl.preprocessor
 
 import org.junit.Assert.*
-import org.junit.Test
+import com.intellij.testFramework.fixtures.BasePlatformTestCase
 
-class LslPreprocessorEngineTest {
+class LslPreprocessorEngineTest : BasePlatformTestCase() {
+    private val preprocessor get() = LslPreprocessorEngine(project)
 
-    @Test
     fun testDefinitionsTracking() {
         val defs = mutableMapOf<String, String>()
 
-        LslPreprocessorEngine.parseAndAddDefine("PROD=\"PACK\"", defs)
+        LslDirectiveEvaluator.parseAndAddDefine("PROD=\"PACK\"", defs)
         assertEquals("\"PACK\"", defs["PROD"])
 
-        LslPreprocessorEngine.parseAndAddDefine("DEBUG 1", defs)
+        LslDirectiveEvaluator.parseAndAddDefine("DEBUG 1", defs)
         assertEquals("1", defs["DEBUG"])
 
-        LslPreprocessorEngine.parseAndAddDefine("FLAG", defs)
+        LslDirectiveEvaluator.parseAndAddDefine("FLAG", defs)
         assertEquals("1", defs["FLAG"])
 
-        LslPreprocessorEngine.parseAndAddDefine("MODE=RELEASE", defs)
+        LslDirectiveEvaluator.parseAndAddDefine("MODE=RELEASE", defs)
         assertEquals("RELEASE", defs["MODE"])
 
-        LslPreprocessorEngine.parseAndAddDefine("#define C_STYLE_FLAG", defs)
+        LslDirectiveEvaluator.parseAndAddDefine("#define C_STYLE_FLAG", defs)
         assertEquals("1", defs["C_STYLE_FLAG"])
 
-        LslPreprocessorEngine.parseAndAddDefine("#define C_STYLE_VAL=200", defs)
+        LslDirectiveEvaluator.parseAndAddDefine("#define C_STYLE_VAL=200", defs)
         assertEquals("200", defs["C_STYLE_VAL"])
     }
 
-    @Test
     fun testConditionPrefixes() {
         val defs = mapOf("PROD" to "\"PACK\"", "DEV" to "0", "ENABLED" to "1")
 
-        assertTrue(LslPreprocessorEngine.evaluateCondition("#if PROD == \"PACK\"", defs))
-        assertFalse(LslPreprocessorEngine.evaluateCondition("#if PROD == \"DEV\"", defs))
+        assertTrue(preprocessor.evaluateCondition("#if PROD == \"PACK\"", defs))
+        assertFalse(preprocessor.evaluateCondition("#if PROD == \"DEV\"", defs))
 
-        assertTrue(LslPreprocessorEngine.evaluateCondition("#ifdef ENABLED", defs))
-        assertFalse(LslPreprocessorEngine.evaluateCondition("#ifdef MISSING", defs))
+        assertTrue(preprocessor.evaluateCondition("#ifdef ENABLED", defs))
+        assertFalse(preprocessor.evaluateCondition("#ifdef MISSING", defs))
 
-        assertTrue(LslPreprocessorEngine.evaluateCondition("#ifndef MISSING", defs))
-        assertFalse(LslPreprocessorEngine.evaluateCondition("#ifndef ENABLED", defs))
+        assertTrue(preprocessor.evaluateCondition("#ifndef MISSING", defs))
+        assertFalse(preprocessor.evaluateCondition("#ifndef ENABLED", defs))
 
-        assertTrue(LslPreprocessorEngine.evaluateCondition("#elif ENABLED", defs))
+        assertTrue(preprocessor.evaluateCondition("#elif ENABLED", defs))
     }
 
-    @Test
     fun testStringEquality() {
         val defs = mapOf("PROD" to "\"PACK\"", "DEV" to "0")
 
-        assertTrue(LslPreprocessorEngine.evaluateCondition("PROD=\"PACK\"", defs))
-        assertTrue(LslPreprocessorEngine.evaluateCondition("PROD==\"PACK\"", defs))
-        assertTrue(LslPreprocessorEngine.evaluateCondition("PROD=PACK", defs))
-        assertTrue(LslPreprocessorEngine.evaluateCondition("PROD==PACK", defs))
-        assertFalse(LslPreprocessorEngine.evaluateCondition("PROD=\"DEV\"", defs))
-        assertTrue(LslPreprocessorEngine.evaluateCondition("PROD!=\"DEV\"", defs))
+        assertTrue(preprocessor.evaluateCondition("PROD=\"PACK\"", defs))
+        assertTrue(preprocessor.evaluateCondition("PROD==\"PACK\"", defs))
+        assertTrue(preprocessor.evaluateCondition("PROD=PACK", defs))
+        assertTrue(preprocessor.evaluateCondition("PROD==PACK", defs))
+        assertFalse(preprocessor.evaluateCondition("PROD=\"DEV\"", defs))
+        assertTrue(preprocessor.evaluateCondition("PROD!=\"DEV\"", defs))
     }
 
-    @Test
     fun testLogicalOrConditions() {
         val defs = mapOf("PROD" to "\"PACK\"")
 
         // A | B
-        assertTrue(LslPreprocessorEngine.evaluateCondition("PROD=\"DEV\" | PROD=\"PACK\"", defs))
-        assertTrue(LslPreprocessorEngine.evaluateCondition("PROD=\"DEV\" || PROD=\"PACK\"", defs))
-        assertFalse(LslPreprocessorEngine.evaluateCondition("PROD=\"DEV\" || PROD=\"STAGING\"", defs))
+        assertTrue(preprocessor.evaluateCondition("PROD=\"DEV\" | PROD=\"PACK\"", defs))
+        assertTrue(preprocessor.evaluateCondition("PROD=\"DEV\" || PROD=\"PACK\"", defs))
+        assertFalse(preprocessor.evaluateCondition("PROD=\"DEV\" || PROD=\"STAGING\"", defs))
 
         val defs2 = mapOf("B" to "1")
-        assertTrue(LslPreprocessorEngine.evaluateCondition("A | B", defs2))
-        assertTrue(LslPreprocessorEngine.evaluateCondition("A || B", defs2))
-        assertFalse(LslPreprocessorEngine.evaluateCondition("A || C", defs2))
+        assertTrue(preprocessor.evaluateCondition("A | B", defs2))
+        assertTrue(preprocessor.evaluateCondition("A || B", defs2))
+        assertFalse(preprocessor.evaluateCondition("A || C", defs2))
     }
 
-    @Test
     fun testLogicalAndConditions() {
         val defs = mapOf("A" to "1", "B" to "1")
-        assertTrue(LslPreprocessorEngine.evaluateCondition("A & B", defs))
-        assertTrue(LslPreprocessorEngine.evaluateCondition("A && B", defs))
+        assertTrue(preprocessor.evaluateCondition("A & B", defs))
+        assertTrue(preprocessor.evaluateCondition("A && B", defs))
 
         val defs2 = mapOf("A" to "1")
-        assertFalse(LslPreprocessorEngine.evaluateCondition("A && B", defs2))
+        assertFalse(preprocessor.evaluateCondition("A && B", defs2))
     }
 
-    @Test
     fun testNegationAndDefined() {
         val defs = mapOf("PROD" to "\"PACK\"")
-        assertTrue(LslPreprocessorEngine.evaluateCondition("defined(PROD)", defs))
-        assertTrue(LslPreprocessorEngine.evaluateCondition("defined PROD", defs))
-        assertFalse(LslPreprocessorEngine.evaluateCondition("!defined(PROD)", defs))
-        assertTrue(LslPreprocessorEngine.evaluateCondition("!defined(DEV)", defs))
-        assertTrue(LslPreprocessorEngine.evaluateCondition("!DEV", defs))
-        assertFalse(LslPreprocessorEngine.evaluateCondition("!PROD", defs))
+        assertTrue(preprocessor.evaluateCondition("defined(PROD)", defs))
+        assertTrue(preprocessor.evaluateCondition("defined PROD", defs))
+        assertFalse(preprocessor.evaluateCondition("!defined(PROD)", defs))
+        assertTrue(preprocessor.evaluateCondition("!defined(DEV)", defs))
+        assertTrue(preprocessor.evaluateCondition("!DEV", defs))
+        assertFalse(preprocessor.evaluateCondition("!PROD", defs))
     }
 
-    @Test
     fun testUndefTracking() {
         val defs = mutableMapOf("FOO" to "1", "BAR" to "2")
 
-        LslPreprocessorEngine.parseAndAddDefine("#define BAZ 3", defs)
+        LslDirectiveEvaluator.parseAndAddDefine("#define BAZ 3", defs)
         assertEquals("3", defs["BAZ"])
 
         defs.remove("FOO")
-        assertFalse(LslPreprocessorEngine.evaluateCondition("defined(FOO)", defs))
-        assertTrue(LslPreprocessorEngine.evaluateCondition("defined(BAR)", defs))
+        assertFalse(preprocessor.evaluateCondition("defined(FOO)", defs))
+        assertTrue(preprocessor.evaluateCondition("defined(BAR)", defs))
     }
 
-    @Test
     fun testNestedAndElifConditions() {
         val defs = mapOf("PROD" to "\"PACK\"", "FEATURE" to "1")
-        assertTrue(LslPreprocessorEngine.evaluateCondition("PROD=\"PACK\" && FEATURE", defs))
-        assertTrue(LslPreprocessorEngine.evaluateCondition("(PROD=\"DEV\" || PROD=\"PACK\") && (FEATURE || !defined(X))", defs))
+        assertTrue(preprocessor.evaluateCondition("PROD=\"PACK\" && FEATURE", defs))
+        assertTrue(preprocessor.evaluateCondition("(PROD=\"DEV\" || PROD=\"PACK\") && (FEATURE || !defined(X))", defs))
     }
 
-    @Test
     fun testSafeFallbacksOnNullOrMalformed() {
-        assertFalse(LslPreprocessorEngine.isElementDisabled(null))
-        assertEquals(emptyList<com.intellij.openapi.util.TextRange>(), LslPreprocessorEngine.getDisabledRanges(null))
-        assertEquals(emptyList<com.intellij.openapi.util.TextRange>(), LslPreprocessorEngine.computeDisabledRanges(null))
-        assertEquals(emptySet<com.intellij.psi.PsiFile>(), LslPreprocessorEngine.getIncludedFiles(null))
+        assertEquals(emptyList<com.intellij.openapi.util.TextRange>(), preprocessor.computeDisabledRanges(null))
 
         // Malformed conditions should safely evaluate to false without throwing
         val defs = emptyMap<String, String>()
-        assertFalse(LslPreprocessorEngine.evaluateCondition("", defs))
-        assertFalse(LslPreprocessorEngine.evaluateCondition("   ", defs))
-        assertFalse(LslPreprocessorEngine.evaluateCondition("(((", defs))
-        assertFalse(LslPreprocessorEngine.evaluateCondition("! && ||", defs))
-        assertFalse(LslPreprocessorEngine.evaluateCondition("defined()", defs))
-        assertFalse(LslPreprocessorEngine.evaluateCondition("#ifdef", defs))
+        assertFalse(preprocessor.evaluateCondition("", defs))
+        assertFalse(preprocessor.evaluateCondition("   ", defs))
+        assertFalse(preprocessor.evaluateCondition("(((", defs))
+        assertFalse(preprocessor.evaluateCondition("! && ||", defs))
+        assertFalse(preprocessor.evaluateCondition("defined()", defs))
+        assertFalse(preprocessor.evaluateCondition("#ifdef", defs))
     }
 
-    @Test
     fun testPurgeNonLslFiles() {
         val tempDir = java.nio.file.Files.createTempDirectory("build_test").toFile()
         try {
@@ -140,7 +128,7 @@ class LslPreprocessorEngineTest {
             assertTrue(lslpFile.exists())
             assertTrue(lslmFile.exists())
 
-            LslPreprocessorEngine.purgeNonLslFiles(tempDir)
+            preprocessor.purgeNonBuildFiles(tempDir)
 
             assertTrue(lslFile.exists())
             assertFalse(lslpFile.exists())

@@ -64,6 +64,9 @@ open class LslBlock(
 
     protected open fun makeChildBlock(child: ASTNode, specialChildAlignment: Alignment?): LslBlock {
         val childIndent = when {
+            child.elementType == LslTypes.PREPROCESSOR_DIRECTIVE &&
+                    LslTypes.STATEMENTS.contains(node.elementType) -> Indent.getNormalIndent()
+
             child.elementType == LslTypes.PREPROCESSOR_DIRECTIVE -> Indent.getAbsoluteNoneIndent()
 
             child.psi is LeafPsiElement && child.psi !is PsiComment -> Indent.getNoneIndent()
@@ -81,6 +84,8 @@ open class LslBlock(
             ).contains(node.elementType) && child.elementType == LslTypes.STATEMENT_BLOCK -> Indent.getNoneIndent()
 
             node.elementType == LslTypes.STATEMENT_EXPRESSION -> Indent.getNoneIndent()
+
+            isCommentBeforeElse(child) -> Indent.getNoneIndent()
 
             child.elementType == LslTypes.STATEMENT_ELSE -> Indent.getNoneIndent()
 
@@ -109,6 +114,27 @@ open class LslBlock(
             codeStyleSettings,
             specialChildAlignment
         )
+    }
+
+    private fun isCommentBeforeElse(child: ASTNode): Boolean {
+        if (node.elementType != LslTypes.STATEMENT_IF ||
+            child.elementType != LslTypes.LINE_COMMENT && child.elementType != LslTypes.BLOCK_COMMENT
+        ) {
+            return false
+        }
+
+        var sibling = child.treeNext
+        while (sibling != null) {
+            if (isWhitespaceOrBlank(sibling) ||
+                sibling.elementType == LslTypes.LINE_COMMENT ||
+                sibling.elementType == LslTypes.BLOCK_COMMENT
+            ) {
+                sibling = sibling.treeNext
+            } else {
+                return sibling.elementType == LslTypes.STATEMENT_ELSE
+            }
+        }
+        return false
     }
 
     override fun getIndent(): Indent? =
