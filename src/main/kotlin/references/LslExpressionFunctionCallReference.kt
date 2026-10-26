@@ -5,7 +5,9 @@ import com.intellij.openapi.components.service
 import com.intellij.openapi.util.TextRange
 import com.intellij.psi.*
 import com.intellij.psi.impl.source.resolve.ResolveCache
+import com.intellij.util.IncorrectOperationException
 import io.github.koollsl.lsl.preprocessor.LslPreprocessorEngine
+import io.github.koollsl.lsl.psi.LslElementFactory
 import io.github.koollsl.lsl.psi.LslExpressionFunctionCall
 import io.github.koollsl.lsl.psi.LslFile
 
@@ -34,6 +36,12 @@ class LslExpressionFunctionCallReference(val element: LslExpressionFunctionCall)
 
     override fun getRangeInElement(): TextRange =
         element.functionNameIdentifier?.textRangeInParent ?: TextRange.EMPTY_RANGE
+
+    override fun handleElementRename(newElementName: String): PsiElement {
+        val identifier = element.functionNameIdentifier
+            ?: throw IncorrectOperationException("LslExpressionFunctionCall has no function name identifier")
+        return identifier.replace(LslElementFactory.createIdentifier(element.project, newElementName))
+    }
 
     private fun resolveInner(): Array<ResolveResult> {
         // Double-check disablement inside cached resolve execution

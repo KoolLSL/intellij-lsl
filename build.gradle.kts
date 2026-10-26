@@ -6,8 +6,8 @@ import java.util.zip.ZipFile
 
 plugins {
     id("java")
-    id("org.jetbrains.kotlin.jvm") version "1.9.23"
-    id("org.jetbrains.intellij") version "1.17.3"
+    id("org.jetbrains.kotlin.jvm") version "2.4.21"
+    id("org.jetbrains.intellij.platform") version "2.19.0"
     antlr
 }
 
@@ -18,9 +18,13 @@ group = "kool"
 sourceSets["main"].java.srcDirs("src/main/gen")
 // Automatic plugin's Version (CalVer: YYYY.MM.DD.HHmm)
 version = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy.MM.dd.HHmm"))
+val intellijPlatformVersion = "2026.2.3"
 
 repositories {
     mavenCentral()
+    intellijPlatform {
+        defaultRepositories()
+    }
 }
 
 dependencies {
@@ -29,6 +33,12 @@ dependencies {
 
     testImplementation("junit:junit:4.13.2")
     testRuntimeOnly("org.opentest4j:opentest4j:1.3.0")
+
+    intellijPlatform {
+        intellijIdea(intellijPlatformVersion)
+        bundledPlugin("com.intellij.java")
+        testFramework(org.jetbrains.intellij.platform.gradle.TestFrameworkType.Platform)
+    }
 }
 
 tasks.generateGrammarSource {
@@ -49,60 +59,51 @@ tasks.compileTestKotlin {
     dependsOn(tasks.generateTestGrammarSource)
 }
 
-// Configure Gradle IntelliJ Plugin
-intellij {
-    version.set("2024.3")
-    type.set("IC")
-    plugins.set(listOf("java"))
-}
-
 kotlin {
     jvmToolchain {
-        languageVersion.set(JavaLanguageVersion.of(17))
+        languageVersion.set(JavaLanguageVersion.of(25))
     }
 }
 
-// Disable buildSearchableOptions for fast local development by default.
-val isRelease = properties["release"]?.toString()?.toBoolean() == true
+intellijPlatform {
+    autoReload.set(true)
+    buildSearchableOptions.set(false)
 
+    pluginConfiguration {
+        ideaVersion {
+            sinceBuild.set("262")
+            untilBuild.set(provider { null })
+        }
+    }
+}
+
+tasks.test {
+    doFirst {
+        val disabledPluginsFile = intellijPlatform.sandboxContainer.get()
+            .dir("${project.name}/IU-$intellijPlatformVersion/config-test")
+            .file("disabled_plugins.txt")
+            .asFile
+        val disabledPlugins = disabledPluginsFile.takeIf { it.exists() }?.readLines().orEmpty()
+        if ("com.intellij.modules.ultimate" !in disabledPlugins) {
+            disabledPluginsFile.appendText("com.intellij.modules.ultimate\n")
+        }
+    }
+}
 
 tasks {
-    // Set the JVM compatibility versions
-    withType<JavaCompile> {
-        sourceCompatibility = "17"
-        targetCompatibility = "17"
-    }
-    withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
-        kotlinOptions.jvmTarget = "17"
+    withType<JavaCompile>().configureEach {
+        sourceCompatibility = "25"
+        targetCompatibility = "25"
     }
 
-    patchPluginXml {
-        sinceBuild.set("243")
-        untilBuild.set("")
+    withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+        compilerOptions {
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_25)
+        }
     }
-
-    // Skips background settings indexing to keep build under 1 second
-    buildSearchableOptions {
-        enabled = false
-    }
-
-    runIde {
-        autoReloadPlugins.set(true)
-    }
-
-    signPlugin {
-        certificateChain.set(System.getenv("CERTIFICATE_CHAIN"))
-        privateKey.set(System.getenv("PRIVATE_KEY"))
-        password.set(System.getenv("PRIVATE_KEY_PASSWORD"))
-    }
-
-    publishPlugin {
-        token.set(System.getenv("PUBLISH_TOKEN"))
-    }
-
 }
 
-tasks.named<org.jetbrains.intellij.tasks.BuildPluginTask>("buildPlugin") {
+tasks.named("buildPlugin") {
     doLast {
         val zipFile = outputs.files.singleFile
         println("\n" + "=".repeat(60))
@@ -179,9 +180,9 @@ tasks.register("installPluginToIDE") {
         println("✔ Plugin installed correctly into: $targetDir")
 
         // Close all IDEs gracefully. Warning: "exit" is not documented anywhere
-        exec {
+        providers.exec {
             commandLine("C:\\Program Files\\JetBrains\\IntelliJ IDEA 2026.2.1\\bin\\idea.exe", "exit")
-        }
+        }.result.get()
 
     }
 }

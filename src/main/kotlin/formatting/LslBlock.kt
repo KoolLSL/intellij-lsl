@@ -17,7 +17,25 @@ open class LslBlock(
     val codeStyleSettings: CommonCodeStyleSettings,
     val specialAlignment: Alignment? = null,
 ) : AbstractBlock(node, wrap, alignment) {
-    override fun getSpacing(child1: Block?, child2: Block): Spacing? = spacingBuilder.getSpacing(this, child1, child2)
+    override fun getSpacing(child1: Block?, child2: Block): Spacing? {
+        val leftType = (child1 as? LslBlock)?.node?.elementType
+        val rightType = (child2 as? LslBlock)?.node?.elementType
+        if (child1 != null &&
+            (leftType == LslTypes.PREPROCESSOR_DIRECTIVE || rightType == LslTypes.PREPROCESSOR_DIRECTIVE)
+        ) {
+            return Spacing.createSpacing(0, 0, 1, true, codeStyleSettings.KEEP_BLANK_LINES_IN_CODE)
+        }
+        if (leftType == LslTypes.BRACE_LEFT || rightType == LslTypes.BRACE_RIGHT) {
+            return Spacing.createSpacing(
+                0,
+                0,
+                1,
+                true,
+                minOf(1, codeStyleSettings.KEEP_BLANK_LINES_IN_CODE),
+            )
+        }
+        return spacingBuilder.getSpacing(this, child1, child2)
+    }
 
     override fun isLeaf(): Boolean = node.firstChildNode == null
 

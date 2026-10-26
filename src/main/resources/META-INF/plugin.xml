@@ -86,7 +86,8 @@
 
     <extensions defaultExtensionNs="com.intellij">
         <notificationGroup id="LSL Viewer Integration" displayType="BALLOON"/>
-        <statusBarWidgetFactory implementation="io.github.koollsl.lsl.viewer.LslViewerStatusBarWidgetFactory"/>
+        <statusBarWidgetFactory id="LslViewerConnectionStatus"
+                                implementation="io.github.koollsl.lsl.viewer.LslViewerStatusBarWidgetFactory"/>
 
         <!-- Project Services -->
         <projectService serviceImplementation="io.github.koollsl.lsl.preprocessor.LslPreprocessorEngine"/>

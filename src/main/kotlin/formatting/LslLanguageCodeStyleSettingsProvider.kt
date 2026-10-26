@@ -15,20 +15,24 @@ class LslLanguageCodeStyleSettingsProvider : LanguageCodeStyleSettingsProvider()
     override fun getCodeSample(settingsType: SettingsType): String = """
 integer foo = 123;
 
+// Sample function
 string bar(integer a)
 {
     list result = ["a"];
-    
+    // Zero
     if (a == 0)
     {
         return "zero";
     }
+    // Negative
     else if (a < 0)
     {
         return "negative";
     }
+    // Positive
     else if (a > 0)
     {
+        // Do something
         do
         {
             integer i = 0;
@@ -70,6 +74,7 @@ default
         commonSettings.METHOD_BRACE_STYLE = CommonCodeStyleSettings.NEXT_LINE
         commonSettings.BRACE_STYLE = CommonCodeStyleSettings.NEXT_LINE
         commonSettings.ELSE_ON_NEW_LINE = true
+        commonSettings.KEEP_BLANK_LINES_IN_CODE = 1
     }
 
     override fun getIndentOptionsEditor() = SmartIndentOptionsEditor()
@@ -89,6 +94,7 @@ default
                 consumer.showStandardOptions("BLANK_LINES_AROUND_METHOD")
                 consumer.showStandardOptions("BLANK_LINES_AROUND_CLASS")
                 consumer.showStandardOptions("BLANK_LINES_AROUND_METHOD_IN_INTERFACE")
+                consumer.showStandardOptions("KEEP_BLANK_LINES_IN_CODE")
 
                 consumer.renameStandardOption("BLANK_LINES_AROUND_METHOD", "Blank lines around function")
                 consumer.renameStandardOption("BLANK_LINES_AROUND_CLASS", "Blank lines around state")

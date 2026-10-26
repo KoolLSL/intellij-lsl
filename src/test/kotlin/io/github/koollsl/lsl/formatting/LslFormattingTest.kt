@@ -168,6 +168,37 @@ default
         )
     }
 
+    fun testPreprocessorDirectivesStayOnSeparateLines() {
+        val commonSettings = com.intellij.psi.codeStyle.CodeStyleSettingsManager.getSettings(project)
+            .getCommonSettings(LslLanguage.INSTANCE)
+        val oldKeepLineBreaks = commonSettings.KEEP_LINE_BREAKS
+
+        try {
+            commonSettings.KEEP_LINE_BREAKS = true
+
+            doTest(
+                """
+default{state_entry(){#ifdef DEBUG
+llOwnerSay("debug"); #endif
+}}
+                """,
+                """
+default
+{
+    state_entry()
+    {
+        #ifdef DEBUG
+        llOwnerSay("debug");
+        #endif
+    }
+}
+                """
+            )
+        } finally {
+            commonSettings.KEEP_LINE_BREAKS = oldKeepLineBreaks
+        }
+    }
+
     fun testStatesAndEvents() {
         doTest(
             """
@@ -284,6 +315,89 @@ default
 }
             """
         )
+    }
+
+    fun testFormattingExpandsCompactedBlocksWhenLineBreaksAreNotKept() {
+        val commonSettings = com.intellij.psi.codeStyle.CodeStyleSettingsManager.getSettings(project)
+            .getCommonSettings(LslLanguage.INSTANCE)
+        val oldKeepLineBreaks = commonSettings.KEEP_LINE_BREAKS
+        val oldKeepBlankLines = commonSettings.KEEP_BLANK_LINES_IN_CODE
+
+        try {
+            commonSettings.KEEP_LINE_BREAKS = false
+            commonSettings.KEEP_BLANK_LINES_IN_CODE = 1
+
+            doTest(
+                """
+default{state_entry(){if(1){// Check condition
+integer i=0;while(i<2){i++;}return;}}
+}
+                """,
+                """
+default
+{
+    state_entry()
+    {
+        if (1)
+        {
+            // Check condition
+            integer i = 0;
+            while (i < 2)
+            {
+                i++;
+            }
+            return;
+        }
+    }
+}
+                """
+            )
+        } finally {
+            commonSettings.KEEP_LINE_BREAKS = oldKeepLineBreaks
+            commonSettings.KEEP_BLANK_LINES_IN_CODE = oldKeepBlankLines
+        }
+    }
+
+    fun testFormattingKeepsAtMostOneBlankLine() {
+        val commonSettings = com.intellij.psi.codeStyle.CodeStyleSettingsManager.getSettings(project)
+            .getCommonSettings(LslLanguage.INSTANCE)
+        val oldKeepLineBreaks = commonSettings.KEEP_LINE_BREAKS
+        val oldKeepBlankLines = commonSettings.KEEP_BLANK_LINES_IN_CODE
+
+        try {
+            commonSettings.KEEP_LINE_BREAKS = true
+            commonSettings.KEEP_BLANK_LINES_IN_CODE = 1
+
+            doTest(
+                """
+default
+{
+    state_entry()
+    {
+        integer i = 0;
+
+
+
+        i++;
+    }
+}
+                """,
+                """
+default
+{
+    state_entry()
+    {
+        integer i = 0;
+
+        i++;
+    }
+}
+                """
+            )
+        } finally {
+            commonSettings.KEEP_LINE_BREAKS = oldKeepLineBreaks
+            commonSettings.KEEP_BLANK_LINES_IN_CODE = oldKeepBlankLines
+        }
     }
 
     fun testForLoopVariants() {

@@ -14,6 +14,7 @@ class SluaDefinitionInitializer : ProjectActivity {
     override suspend fun execute(project: Project) {
         SluaDefinitionManager.ensureDefinitionsAvailable(project)
 
+        if (ApplicationManager.getApplication().isUnitTestMode) return
         if (!LslSettings.instance.useGithubDefinitions) return
 
         ApplicationManager.getApplication().executeOnPooledThread {

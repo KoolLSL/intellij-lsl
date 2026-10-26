@@ -43,6 +43,9 @@ class LslFormattingModelBuilder : FormattingModelBuilder {
         var builder = SpacingBuilder(settings, LslLanguage.INSTANCE)
             .after(LslTypes.LINE_COMMENT).lineBreakInCode()
             .around(LslTypes.COMMENTS).spaceIf(true)
+            .between(LslTypes.STATEMENTS, LslTypes.STATEMENTS).lineBreakInCode()
+            .between(LslTypes.STATEMENTS, LslTypes.COMMENTS).lineBreakInCode()
+            .between(LslTypes.COMMENTS, LslTypes.STATEMENTS).lineBreakInCode()
 
             .around(LslTypes.FUNCTION).blankLines(commonSettings.BLANK_LINES_AROUND_METHOD)
             .around(LslTypes.DEFAULT_STATE_DECLARATION).blankLines(commonSettings.BLANK_LINES_AROUND_CLASS)
