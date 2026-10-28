@@ -240,15 +240,26 @@ private class ViewerObjectsDialog(
     override fun doOKAction() {
         if (deploymentInProgress) return
         selectedPushRequest()?.let { request ->
-            FileDocumentManager.getInstance().saveAllDocuments()
+
             deploymentInProgress = true
             setOKActionEnabled(false)
+            try {
+                ApplicationManager.getApplication().runWriteAction {
+                    FileDocumentManager.getInstance().saveAllDocuments()
+                }
+            } catch (error: Exception) {
+                deploymentInProgress = false
+                appendLog("Could not save documents before push: ${error.message ?: error.javaClass.simpleName}")
+                updateDeployButton()
+                return
+            }
+
             val target = request.target
             appendLog(
                 if (request.scripts == null) {
                     "Pushing to object: ${target.objectName}"
                 } else {
-                    "Pushing ${request.scripts.size} selected scripts to object: ${target.objectName}"
+                    "Pushing ${request.scripts.size} selected scripts to '${target.objectName}'"
                 }
             )
             project.service<LslProjectDeploymentService>().launchMappedDeployment(
@@ -663,7 +674,7 @@ private class ViewerObjectTreeCellRenderer : DefaultTreeCellRenderer() {
                 "No matching .lsl build output or .luau file in the project."
             (entry.projectMatch?.matchCount ?: 0) > 1 ->
                 "Multiple project matches (${entry.projectMatch?.matchCount}); pushing ${entry.projectMatch?.relativePath}."
-            else -> "Pushes ${entry.projectMatch?.relativePath}."
+            else -> "Matches ${entry.projectMatch?.relativePath}"
         }
         return component
     }
