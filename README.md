@@ -121,7 +121,9 @@ In the IDE, click the **Viewer** widget in the bottom status bar, or choose **To
 Select an object to update all matching scripts, or select individual scripts, then click **Update**. Scripts are matched by name (without the extension)—for example, `MyProject/build/Script A.lsl` matches the object script `Script A`, `MyProject/Script B.luau` matches `Script B`. 
 
 Matching names are searched throughout the project, so unique script names are recommended. Only scripts that already exist in the object can be updated; it does not create new scripts. This prevents unintended changes to an object's contents. If needed, create a blank script in the viewer first. The log shows the update progress along with any warnings or errors.
+
 ![IntelliJ-Viewer.jpg](docs/assets/IntelliJ-Viewer.jpg)
+
 ---
 
 ### Include Files (LSL only)
