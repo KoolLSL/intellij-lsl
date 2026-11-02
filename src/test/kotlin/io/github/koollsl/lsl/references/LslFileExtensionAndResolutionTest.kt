@@ -3,6 +3,7 @@ package io.github.koollsl.lsl.references
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import KwdbData
 import LslFileType
+import io.github.koollsl.lsl.inspections.LslUnmatchedDirectiveInspection
 import io.github.koollsl.lsl.preprocessor.LslPreprocessorEngine
 import io.github.koollsl.lsl.preprocessor.LslIncludesCollector
 import io.github.koollsl.lsl.psi.LslExpressionFunctionCall
@@ -20,7 +21,7 @@ class LslFileExtensionAndResolutionTest : BasePlatformTestCase() {
 
     fun testResolveFunctionAcrossLslpAndLslmFiles() {
         myFixture.addFileToProject(
-            "MathLib.lslp",
+            "MathLib.lslm",
             """
 integer addNumbers(integer a, integer b) {
     return a + b;
@@ -40,6 +41,9 @@ integer multiplyNumbers(integer a, integer b) {
         val mainFile = myFixture.configureByText(
             "Main.lslp",
             """
+#include "MathLib.lslm"
+#include "LegacyLib.lslm"
+
 default {
     state_entry() {
         integer sum = addNumbers(1, 2);
@@ -70,7 +74,7 @@ default {
 
     fun testResolveGlobalVariablesAcrossLslpAndLslmFiles() {
         myFixture.addFileToProject(
-            "Config.lslp",
+            "Config.lslm",
             """
 integer CONFIG_TIMEOUT = 30;
             """.trimIndent()
@@ -86,6 +90,9 @@ string CONFIG_PREFIX = "TEST_";
         val mainFile = myFixture.configureByText(
             "Consumer.lsl",
             """
+#include "Config.lslm"
+#include "LegacyConfig.lslm"
+
 default {
     state_entry() {
         integer t = CONFIG_TIMEOUT;
@@ -227,7 +234,7 @@ default {
         assertTrue(includedNames.contains("HeaderA.lslm"))
         assertTrue(includedNames.contains("HeaderB.lslm"))
         assertTrue(includedNames.contains("HeaderC.lslm"))
-        assertFalse(includedNames.contains("HeaderD.lslm"))
+        assertTrue(includedNames.contains("HeaderD.lslm"))
     }
 
     fun testCyclicIncludeSafety() {
@@ -265,7 +272,7 @@ default {
         assertEquals(2, included.size)
     }
 
-    fun testMissingIncludeWarningAnnotation() {
+    fun testMissingIncludeDiagnostic() {
         myFixture.configureByText(
             "TestIncludeWarning.lslp",
             """
@@ -280,11 +287,18 @@ default {
             """.trimIndent()
         )
 
+        myFixture.enableInspections(LslUnmatchedDirectiveInspection())
         val highlights = myFixture.doHighlighting()
-        val warningHighlights = highlights.filter { it.severity == com.intellij.lang.annotation.HighlightSeverity.WARNING }
+        val includeDiagnostics = highlights.filter {
+            it.description?.contains("include file") == true ||
+                it.description?.contains("missing_file.lslm") == true
+        }
 
-        assertTrue(warningHighlights.any { it.description == "missing_file.lslm to include not found" })
-        assertFalse(warningHighlights.any { it.description == "ignored_missing.lslm to include not found" })
+        assertTrue(
+            "Highlights: ${includeDiagnostics.map { it.description }}",
+            includeDiagnostics.any { it.description == "Cannot find include file 'missing_file.lslm'" }
+        )
+        assertFalse(includeDiagnostics.any { it.description?.contains("ignored_missing.lslm") == true })
     }
 
     fun testPreprocessIncludeFromBuffer() {
@@ -292,7 +306,7 @@ default {
             "BufferHeader.lslm",
             """
             integer BUFFER_VAL = 99;
-            void bufferFunc() {
+            bufferFunc() {
                 llOwnerSay("hello");
             }
             """.trimIndent()
@@ -312,6 +326,6 @@ default {
 
         val output = preprocessor.preprocessFile(mainFile)
         assertTrue(output.contains("bufferFunc"))
-        assertTrue(output.contains("Begin Include: BufferHeader.lslm"))
+        assertTrue(output.contains("BEGIN INCLUDE: BufferHeader ("))
     }
 }

@@ -13,9 +13,9 @@ editors across Windows, macOS, and Linux.
 * **Up-to-date language definitions:** LSL functions, constants, and events, along with SLua definitions and documentation, are downloaded from the official [Second Life language definitions](https://github.com/secondlife/lsl-definitions) project. The plugin checks for updates or can use a custom local folder instead.
 * **Smart Scripting Tools:** Instant syntax highlighting, real-time error checking, smart auto-completion, and safe variable/function refactoring.
 * **Code Formatting & Clean Up:** Automatically format your code, fix indentation, and keep your scripts clean and readable.
-* **Advanced Preprocessor (LSL only):** Use file inclusions (`#include`), function inlining (`#inline`), and conditional blocks (`#ifdef`...) to organize large script projects. SLua uses the `require()` module system instead.
+* **Advanced Preprocessor (LSL only):** Use file inclusions (`#include`), function inlining (`#inline`), and conditional blocks (`#ifdef`...) to organize large script projects and library. SLua uses the `require()` module system instead.
 * **Memory Optimization (LSL only):** Before compiling, built-in constant optimization evaluates static math, replaces fixed variables, and eliminates dead code to help keep scripts within LSL's memory limits. SLua has its own methods.
-* **Push scripts to in-world objects:** Explore in-world objects and push scripts to selected objects through viewer's WebSocket. Your local project remains the master source, so your scripts are preserved even if the in-world objects are deleted. _(Requires Second Life 26.4+. Firestorm coming soon.)_
+* **Update scripts to in-world objects:** Explore in-world objects and update scripts to selected objects through viewer's WebSocket. Your local project remains the master source, so your code is preserved even if the in-world objects are deleted. _(Requires Second Life 26.4+. Firestorm coming soon.)_
 
 ### Auto-completion
 - **LSL**
@@ -53,13 +53,6 @@ editors across Windows, macOS, and Linux.
 ![Refactor](docs/assets/IntelliJ-Refactor.png)
 
 ---
-
-### IntelliJ vs VS Code
-
-VS Code with the [official Second Life extension](https://github.com/secondlife/sl-vscode-plugin) is great for quickly editing live scripts directly in-world. IntelliJ IDEA with the KoolLSL plugin focuses on larger, long-term offline development workflows: organize scripts and libraries in a structured project, then manually push them to their corresponding in-world objects.
-
-
----
 ### How to Install
 
 1. Open your JetBrains IDE such as [IntelliJ IDEA](https://www.jetbrains.com/idea/).<br><br>
@@ -70,29 +63,35 @@ VS Code with the [official Second Life extension](https://github.com/secondlife/
     * **From GitHub:**: Settings > Plugins, click the ⚙️ icon at top > **Install Plugin from Disk...** to use a
       downloaded `intellij-lsl-version.zip` from [GitHub Releases](https://github.com/KoolLSL/intellij-lsl/releases).<br><br>
 
-3. Go in Settings > Languages &amp; Frameworks > <b>LSL</b>.
-    * **LSL**  language: The KoolLSL plugin works out of the box with no extra setup.
-    * **SLua** language: The KoolLSL plugin needs the companion [Luau plugin](https://plugins.jetbrains.com/plugin/24957) and provides it with  additional Second Life's SLua definitions. Click the link to install it if needed. It will install other required components, including `luau-lslp` from Johnny Morganz (the same Luau engine used by the VS Code extension). 
-    * The Settings > **Plugins** page should show this (LSP4IJ is only for IntelliJ Free edition):<br>
-         <img src="docs/assets/Plugins.png" alt="Luau settings" width="360">
+3. Go in Settings > Languages &amp; Frameworks > <b>LSL</b> to review the plugin options.<br>
+Type **LSL** in your IDE Settings to customize other options such as Code Style, Color Scheme, Inspections, Inlay Hints...<br><br>
+
+
+#### For LSL scripts
+The KoolLSL plugin works out of the box for LSL with no extra setup. See **How to Use** below.
+
+#### For SLua scripts (additional setup required)
+
+The KoolLSL plugin needs the companion [Luau plugin](https://plugins.jetbrains.com/plugin/24957) to which it provides the Second Life's SLua definitions. Click the link on Settings to install Luau if needed. It will install other required components, including `luau-lslp` from Johnny Morganz (the same Luau engine used by the Second Life's VS Code extension). 
+The Settings > **Plugins** page should show this (LSP4IJ is only for IntelliJ Free edition):<br>
+       <img src="docs/assets/Plugins.png" alt="Luau settings" width="360">
    <br><br>
 
-4. Go in Settings > Languages &amp; Frameworks > **Luau**, verify language setup:
+1. Go in Settings > Languages &amp; Frameworks > **Luau**, verify language setup:
     <img src="docs/assets/Luau-settings.png" alt="Luau settings">
      <br><br>
 
-4. From Settings > Languages &amp; Frameworks > **LSL**, copy <code>--definitions</code> and <code>--docs</code> full paths. They indicate where the definitions were downloaded from GitHub:
+2. From Settings > Languages &amp; Frameworks > **LSL**, copy <code>--definitions</code> and <code>--docs</code> full paths. They indicate where the definitions were downloaded from GitHub:
     <img src="docs/assets/LSL-settings.png" alt="Luau settings" width="800">
    <br><br>
 
-5. Paste in Settings > Languages &amp; Frameworks > Language Servers > 
+3. Paste in Settings > Languages &amp; Frameworks > Language Servers > 
     **Luau Language Server**, for both <b>Server</b> and <b>Installer</b>, the same
  <code>--definitions</code> (including the <code>:@sl-slua</code> token) and <code>--docs</code> paths indicated on the <b>LSL</b> page: 
    <img src="docs/assets/Luau-language-server-b.png" alt="Luau settings" width="800">
    <img src="docs/assets/Luau-language-server.png" alt="Luau settings" width="800">
    <br><br>
 
-6. Type **LSL** in your IDE **Settings** to customize other plugin options: Code Style, Color Scheme, Inspections, Inlay Hints...<br><br>
 
 ---
 
@@ -107,16 +106,22 @@ VS Code with the [official Second Life extension](https://github.com/secondlife/
      **Open Generated .lsl** to view the output.
    * **SLua:** Select **File → New → Luau File** to create a `.luau` script. There is no separate build step: the `.luau` file is the script you use.
 3. **Use your script in Second Life:** Choose the workflow that suits you:
-   * **Viewer push:** Push project scripts to an in-world explored object, as described below.
-   * **Firestorm:** Use the LSL preprocessor to `#include` your built `.lsl` file (for example, `#include "MyProject/build/MyScript.lsl"`).
+   * **Viewer object:** Update project scripts to an in-world explored object, as described below.
+   * **Firestorm:** Use the LSL preprocessor to `#include` your built `.lsl` file (i.e. `#include "MyProject/build/Script A.lsl"`), or  `.luau` file (i.e. `#include "MyProject/Script B.luau"`)
    * **Copy and paste:** Copy the script contents into the in-world editor.
 
-### Push scripts to an in-world object
+### Update scripts to in-world objects
 
-Viewer push connects IntelliJ to your Second Life Viewer. To get started, enable it under Settings > Languages &amp; Frameworks >  **LSL**, then, in SL viewer, start **Build → Scripts → Script Editor Server**. Open the object's **Content** tab and click **Explore in IDE**. In IntelliJ, click the **Viewer** widget in the bottom status bar, or choose **Tools → Second Life**, to open the selector.
+_Note: This method was introduced in late 2026 and may evolve._
 
-Select an object to push its matching scripts, or select individual scripts, then click **Push**. IntelliJ matches scripts by name (without the extension)—for example, `build/Script A.lsl` matches the in-world script `Script A`, and `Script B.luau` matches `Script B`. Matches are searched throughout your project, so unique script names are recommended. IntelliJ only updates scripts that already exist in the object; create a blank script in the viewer first if needed.
+Connect the IDE to your Second Life Viewer. To get started, enable it under Settings > Languages &amp; Frameworks >  **LSL**, then, in SL viewer, start **Build → Scripts → Script Editor Server**. Open the object's **Content** tab and click **Explore in IDE**. 
 
+In the IDE, click the **Viewer** widget in the bottom status bar, or choose **Tools → Second Life**, to open the selector.
+
+Select an object to update all matching scripts, or select individual scripts, then click **Update**. Scripts are matched by name (without the extension)—for example, `MyProject/build/Script A.lsl` matches the object script `Script A`, `MyProject/Script B.luau` matches `Script B`. 
+
+Matching names are searched throughout the project, so unique script names are recommended. Only scripts that already exist in the object can be updated; it does not create new scripts. This prevents unintended changes to an object's contents. If needed, create a blank script in the viewer first. The log shows the update progress along with any warnings or errors.
+![IntelliJ-Viewer.jpg](docs/assets/IntelliJ-Viewer.jpg)
 ---
 
 ### Include Files (LSL only)
@@ -142,6 +147,15 @@ For LSL, you can split your code into reusable files and include them in your sc
 * **`#inline`** — Inlines the function written below directly in the code instead of calling it.
 ---
 
+### IntelliJ vs VS Code
+
+Both tools support LSL and SLua development, but they target different workflows.
+
+**VS Code + the official Second Life extension** provides viewer integration, object exploration, script synchronization, preprocessing, debugging tools, and language-aware editing features. Its lightweight design makes it especially convenient for quick edits, rapid iteration, and working directly with in-world content.
+
+**IntelliJ IDEA + KoolLSL** brings the same core functionality to the JetBrains IDEs while adding advanced navigation, refactoring, inspections, project structure, local history, Git integration, and AI tooling. Creators working on larger projects may prefer its stable and structured project model, which helps keep locally developed scripts, libraries, and documentation organized and maintainable in the long term.
+
+---
 
 ### Building the plugin (optional)
 
@@ -160,10 +174,9 @@ JetBrains Marketplace and GitHub Releases, so building it locally is mainly for 
 > on [GitHub Issues](https://github.com/KoolLSL/intellij-lsl/issues).
 
 This project is a modernized fork of the original [riej/lsl](https://github.com/riej/lsl) plugin. Compiled and tested on
-**IntelliJ IDEA 2026.2.1**, **Java 17**, and **Windows 11**.
+**IntelliJ IDEA 2026.2.3**, **Java 21**, and **Windows 11**.
 
-Compared to Eclipse/LSLForge, this plugin has no internal simulator but offers preprocessing and syntax checking inside
-the more modern JetBrains IDEs. This also makes the plugin easier to install and maintain.
+If you come from Eclipse IDE with LSLForge, IntelliJ IDEA will feel very familiar as it uses a similar project structure. Compared to LSLForge, this plugin has no internal simulator but offers smarter language tools inside the more modern JetBrains IDEs. This also makes the plugin easier to install and maintain.
 
 
 <sub style="color: #6a737d;">

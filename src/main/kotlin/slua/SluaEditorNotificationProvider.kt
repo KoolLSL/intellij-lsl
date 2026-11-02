@@ -1,7 +1,7 @@
 package io.github.koollsl.lsl.slua
 
 import com.intellij.ide.BrowserUtil
-import com.intellij.ide.plugins.PluginManagerCore
+import com.intellij.ide.plugins.PluginDetailsService
 import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.fileEditor.FileEditor
 import com.intellij.openapi.options.ShowSettingsUtil
@@ -28,9 +28,10 @@ class SluaEditorNotificationProvider : EditorNotificationProvider {
             "https://plugins.jetbrains.com/plugin/24957"
 
         fun getLuauPluginStatus(): LuauPluginStatus {
-            val plugin = PluginManagerCore.getPlugin(PluginId.getId(LUAU_PLUGIN_ID))
-                ?: return LuauPluginStatus.TO_INSTALL
-            return if (plugin.isEnabled) LuauPluginStatus.INSTALLED else LuauPluginStatus.DISABLED
+            val pluginId = PluginId.getId(LUAU_PLUGIN_ID)
+            val pluginDetails = PluginDetailsService.getInstance()
+            if (pluginDetails.findDetails(pluginId) == null) return LuauPluginStatus.TO_INSTALL
+            return if (pluginDetails.isLoaded(pluginId)) LuauPluginStatus.INSTALLED else LuauPluginStatus.DISABLED
         }
     }
 

@@ -9,11 +9,17 @@ import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.ui.DialogPanel
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.openapi.wm.impl.status.widget.StatusBarWidgetsManager
+import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBRadioButton
+import com.intellij.ui.components.JBCheckBox
 import com.intellij.ui.dsl.builder.*
 import io.github.koollsl.lsl.shared.definitions.DefinitionsSourceManager
+import io.github.koollsl.lsl.slua.LuauPluginStatus
 import io.github.koollsl.lsl.slua.SluaEditorNotificationProvider
 import io.github.koollsl.lsl.slua.SluaServerConfigurationChecker
+import io.github.koollsl.lsl.viewer.LslViewerStatusBarWidgetFactory
+import java.awt.Color
 import java.io.IOException
 import javax.swing.JComponent
 import javax.swing.JLabel
@@ -38,7 +44,7 @@ class LslSettingsConfigurable : SearchableConfigurable {
 
         val sluaDefinitionsInfo = DefinitionsSourceManager.getLuauDefinitionsInfo()
         val sluaDocsInfo = DefinitionsSourceManager.getLuauDocsInfo()
-        val luauPluginStatus = SluaEditorNotificationProvider.getLuauPluginStatus().displayName
+        val luauPluginStatus = SluaEditorNotificationProvider.getLuauPluginStatus()
         val sluaServerConfig = JTextArea(sluaServerConfiguration(), 4, 80).apply {
             isEditable = false
             lineWrap = true
@@ -50,6 +56,7 @@ class LslSettingsConfigurable : SearchableConfigurable {
 
         var githubSourceButton: Cell<JBRadioButton>? = null
         var customFolderButton: Cell<JBRadioButton>? = null
+        var viewerIntegrationCheckBox: Cell<JBCheckBox>? = null
 
         var lslDefinitionsInfo = DefinitionsSourceManager.getLslDefinitionsInfo()
         if (activeProject != null) {
@@ -78,13 +85,15 @@ class LslSettingsConfigurable : SearchableConfigurable {
 
             separator()
             row {
-                checkBox("Enable Second Life viewer push")
+                checkBox("Enable Second Life viewer's objects")
                     .bindSelected(settings::viewerIntegrationEnabled)
-                    .comment("Connect to the viewer's Script Editor Server and manually push project scripts that match explored object scripts by name.")
+                    .also { viewerIntegrationCheckBox = it }
+                    .comment("Connect to the viewer's Script Editor Server to manually update in-world object scripts that have matching project scripts. Click the Viewer widget in the bottom bar to start.")
             }
             row("Viewer WebSocket port:") {
                 intTextField(1..65535)
                     .bindIntText(settings::viewerWebSocketPort)
+                    .enabledIf(viewerIntegrationCheckBox!!.selected)
             }
 
             separator()
@@ -223,7 +232,26 @@ class LslSettingsConfigurable : SearchableConfigurable {
                 text("<b>SLua language support</b>")
             }
             row("Luau plugin:") {
-                label(luauPluginStatus)
+                val (symbol, color) = when (luauPluginStatus) {
+                    LuauPluginStatus.INSTALLED ->
+                        "✓" to JBColor.namedColor(
+                            "Label.successForeground",
+                            JBColor(Color(0x2E7D32), Color(0x81C784))
+                        )
+                    LuauPluginStatus.DISABLED ->
+                        "⚠" to JBColor.namedColor(
+                            "Label.warningForeground",
+                            JBColor(Color(0xB26A00), Color(0xFFB74D))
+                        )
+                    LuauPluginStatus.TO_INSTALL ->
+                        "⚠" to JBColor.namedColor(
+                            "Label.errorForeground",
+                            JBColor(Color(0xB3261E), Color(0xF28B82))
+                        )
+                }
+                label("$symbol ${luauPluginStatus.displayName}").apply {
+                    component.foreground = color
+                }
                 browserLink(
                     "View on JetBrains Marketplace",
                     SluaEditorNotificationProvider.LUAU_PLUGIN_MARKETPLACE_URL
@@ -232,13 +260,11 @@ class LslSettingsConfigurable : SearchableConfigurable {
             row {
                 comment(
                     """
-    This plugin provides all LSL support directly.
-    For SLua editing, it integrates with the <code>Luau</code> plugin from Aleksandr Slepchenkov,
-    which automatically installs the required components:
+    For SLua editing, the <code>Luau</code> plugin by Aleksandr Slepchenkov is required. It automatically installs the following components:
     <ul>
-    <li><a href="https://github.com/JohnnyMorganz/luau-lsp">luau-lsp</a> from Johnny Morganz
+    <li><a href="https://github.com/JohnnyMorganz/luau-lsp">luau-lsp</a> by Johnny Morganz
     (the same Luau engine used by Second Life's official VS Code extension).</li>
-    <li><a href="https://plugins.jetbrains.com/plugin/23257-lsp4ij">LSP4IJ</a> from Red Hat (to enable Language Servers on IntelliJ free edition)</li>
+    <li><a href="https://plugins.jetbrains.com/plugin/23257-lsp4ij">LSP4IJ</a> by Red Hat (to enable Language Servers on IntelliJ free edition)</li>
     </ul>
     Once installed, verify in
     <code>Languages &amp; Frameworks / Language Servers</code>
@@ -300,6 +326,9 @@ class LslSettingsConfigurable : SearchableConfigurable {
 
     override fun apply() {
         panel?.apply()
+        ApplicationManager.getApplication()
+            .getService(StatusBarWidgetsManager::class.java)
+            .updateWidget(LslViewerStatusBarWidgetFactory::class.java)
     }
 
     override fun reset() {

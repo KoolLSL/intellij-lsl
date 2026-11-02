@@ -8,7 +8,7 @@ class LslStructureViewTest : BasePlatformTestCase() {
 
     fun testStructureViewPresentationsAndIcons() {
         val file = myFixture.configureByText(
-            "TestScript.lsl",
+            "TestScript.lslp",
             """
 integer gCount = 0;
 
@@ -28,8 +28,8 @@ state otherState {
         ) as LslFile
 
         val rootElement = LslStructureViewElement(file)
-        assertEquals("TestScript.lsl", rootElement.presentation.presentableText)
-        assertEquals(LslIcons.FILE_LSL, rootElement.presentation.getIcon(false))
+        assertEquals("TestScript.lslp", rootElement.presentation.presentableText)
+        assertEquals(LslIcons.FILE_LSLP, rootElement.presentation.getIcon(false))
 
         val children = rootElement.children
         assertEquals(4, children.size)

@@ -1,5 +1,6 @@
 # Local Build Outputs & Caches
 .gradle/
+.gradle-home/
 .kotlin/
 .intellijPlatform/
 build/

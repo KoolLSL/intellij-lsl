@@ -27,6 +27,27 @@ repositories {
     }
 }
 
+kotlin {
+    jvmToolchain {
+        languageVersion.set(JavaLanguageVersion.of(25))
+    }
+}
+
+intellijPlatform {
+    autoReload.set(true)
+    buildSearchableOptions.set(false)
+
+    // Keep the IntelliJ plugin sandbox off OneDrive
+    sandboxContainer.set(file("D:/IntelliJSandbox"))
+
+    pluginConfiguration {
+        ideaVersion {
+            sinceBuild.set("262")
+            untilBuild.set(provider { null })
+        }
+    }
+}
+
 dependencies {
     antlr("org.antlr:antlr4:4.11.1")
     implementation("org.antlr:antlr4-runtime:4.11.1")
@@ -57,24 +78,6 @@ tasks.compileKotlin {
 
 tasks.compileTestKotlin {
     dependsOn(tasks.generateTestGrammarSource)
-}
-
-kotlin {
-    jvmToolchain {
-        languageVersion.set(JavaLanguageVersion.of(25))
-    }
-}
-
-intellijPlatform {
-    autoReload.set(true)
-    buildSearchableOptions.set(false)
-
-    pluginConfiguration {
-        ideaVersion {
-            sinceBuild.set("262")
-            untilBuild.set(provider { null })
-        }
-    }
 }
 
 tasks.test {

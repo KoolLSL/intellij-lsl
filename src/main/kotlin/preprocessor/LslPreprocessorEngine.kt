@@ -2,7 +2,7 @@ package io.github.koollsl.lsl.preprocessor
 
 import KwdbData
 import LslPrimitiveType
-import com.intellij.ide.plugins.PluginManager
+import com.intellij.ide.plugins.PluginDetailsService
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.Logger
@@ -34,6 +34,24 @@ import java.util.Date
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.collections.ArrayDeque
 import kotlin.collections.last
+
+private class ProcessedSourceProvider(
+    private val engine: LslPreprocessorEngine,
+    private val file: PsiFile,
+    private val project: Project
+) : CachedValueProvider<LslPreprocessorEngine.ProcessedSource> {
+    override fun compute(): CachedValueProvider.Result<LslPreprocessorEngine.ProcessedSource> {
+        val result = engine.processDirectives(
+            LslPreprocessorEngine.SourceContext(file = file, project = project),
+            false
+        )
+        return CachedValueProvider.Result.create(
+            result,
+            file,
+            ProjectRootManager.getInstance(project)
+        )
+    }
+}
 
 
 @Service(Service.Level.PROJECT)
@@ -69,10 +87,15 @@ class LslPreprocessorEngine(private val project: Project) {
          * Prepares a child context when stepping into an included file.
          * Increments recursion depth and tracks visited paths to prevent infinite recursion loops.
          */
-        fun forChild(targetFile: PsiFile, targetPath: String): SourceContext {
+        fun forChild(
+            targetFile: PsiFile,
+            targetPath: String,
+            inheritedDefinitions: Map<String, String> = definitions
+        ): SourceContext {
             visitedFiles.add(targetPath) // Modifies the shared set instance
             return copy(
                 file = targetFile,
+                definitions = inheritedDefinitions,
                 depth = depth + 1,
                 includeCounter = includeCounter + 1
             )
@@ -146,18 +169,14 @@ class LslPreprocessorEngine(private val project: Project) {
     fun getCachedProcessDirectives(ctx: SourceContext): ProcessedSource {
         val file = ctx.file ?: return ProcessedSource(expandedText = "")
 
+        if (ctx.definitions.isNotEmpty() || ctx.visitedFiles.isNotEmpty() || ctx.depth != 0 || ctx.includeCounter != 0) {
+            return processDirectives(ctx, false)
+        }
+
         return CachedValuesManager.getManager(ctx.project).getCachedValue(
             file,
             PROCESSED_SOURCE_KEY,
-            {
-                val result = processDirectives(ctx, false)
-
-                CachedValueProvider.Result.create(
-                    result,
-                    file, // Invalidates cache when the PSI file is modified
-                    ProjectRootManager.getInstance(ctx.project) // Invalidates when project dependencies change
-                )
-            },
+            ProcessedSourceProvider(this, file, ctx.project),
             false // trackValue = false (standard for AST/PSI dependencies)
         )
     }
@@ -308,8 +327,12 @@ class LslPreprocessorEngine(private val project: Project) {
                                     if (pathKey !in ctx.visitedFiles) {
                                         ctx.visitedFiles.add(pathKey)
 
-                                        // Pass immutable snapshot downstream to child context
-                                        val childCtx = ctx.forChild(includedPsi, pathKey)
+                                        // Child processing copies this active macro state before changing it.
+                                        val childCtx = ctx.forChild(
+                                            includedPsi,
+                                            pathKey,
+                                            localDefinitions
+                                        )
 
                                         // Recursive execution returning child result
                                         val childResult = processDirectives(childCtx, markIncludes)
@@ -331,6 +354,7 @@ class LslPreprocessorEngine(private val project: Project) {
                                         }
 
                                         // Merge child outputs into parent execution state
+                                        localDefinitions.clear()
                                         localDefinitions.putAll(childResult.definitions)
                                         diagnostics.addAll(childResult.diagnostics)
                                         totalIncludesProcessed += childResult.processedIncludeCount + 1
@@ -489,7 +513,7 @@ class LslPreprocessorEngine(private val project: Project) {
         }
 
         val psiFile = PsiManager.getInstance(project).findFile(virtualFile) ?: return null
-        val finalizedCode = preprocessFile(psiFile)
+        val finalizedCode = preprocessFile(psiFile, generatedFileName = outputFileName)
 
         var resultFile: VirtualFile? = null
         ApplicationManager.getApplication().runWriteAction {
@@ -789,7 +813,11 @@ class LslPreprocessorEngine(private val project: Project) {
         }
     }
 
-    fun preprocessFile(file: PsiFile, initialDefinitions: Map<String, String> = emptyMap()): String {
+    fun preprocessFile(
+        file: PsiFile,
+        initialDefinitions: Map<String, String> = emptyMap(),
+        generatedFileName: String = "${file.name.substringBeforeLast('.')}.lsl"
+    ): String {
         if (file.project.isDisposed || !file.isValid) return ""
 
         // 1. Expand includes and directives into text
@@ -932,12 +960,10 @@ class LslPreprocessorEngine(private val project: Project) {
         // 7. Emit output header & run section emitter
         val sb = StringBuilder()
 
-        val pluginId =
-            PluginId.getId("io.github.koollsl.intellij-lsl") // Replace with your exact plugin ID from plugin.xml
-        val plugin = PluginManager.getInstance().findEnabledPlugin(pluginId)
-        val pluginName = plugin?.name ?: "unknown"
-        val fileName = plugin?.pluginPath?.fileName?.toString() ?: "unknown"
-        val version = plugin?.version ?: "UNKNOWN"
+        val pluginId = PluginId.getId("io.github.koollsl.intellij-lsl")
+        val pluginDetails = PluginDetailsService.getInstance().findDetails(pluginId)
+        val pluginName = pluginDetails?.name ?: "unknown"
+        val version = pluginDetails?.version ?: "UNKNOWN"
 
         fun shortenPath(project: Project, path: String): String {
             val base = project.basePath?.replace('\\', '/')?.trimEnd('/') ?: return path
@@ -971,11 +997,12 @@ class LslPreprocessorEngine(private val project: Project) {
         val allRoots = getModuleAndRoots(file, project)
 
         sb.appendLine("// ---------------------------------------------------------------")
-        sb.appendLine("// Generated by '$pluginName' Preprocessor")
+        sb.appendLine("// Generated by '$pluginName' Preprocessor (JetBrains IDE)")
         sb.appendLine("// ---------------------------------------------------------------")
-        sb.appendLine("// Source file            : $mainFileName")
-        sb.appendLine("// Generation time        : $timestamp")
         sb.appendLine("// Project                : ${project.name}")
+        sb.appendLine("// Source file            : $mainFileName")
+        sb.appendLine("// Output file            : build/$generatedFileName")
+        sb.appendLine("// Generated on           : $timestamp")
 
         // List defines
         if (processed.definitions.isNotEmpty()) {
@@ -1000,7 +1027,7 @@ class LslPreprocessorEngine(private val project: Project) {
         }
 
         sb.appendLine("// ---------------------------------------------------------------")
-        sb.appendLine("// LSL plugin version     : $fileName $version")
+        sb.appendLine("// LSL plugin version     : ${pluginId.idString} $version")
         sb.appendLine("// LSL definitions        : ${kwdbInfo.source} ${kwdbInfo.datetime}")
         sb.appendLine("// ---------------------------------------------------------------")
         sb.appendLine()

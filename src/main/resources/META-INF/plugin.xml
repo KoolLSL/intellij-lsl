@@ -67,21 +67,13 @@
             <separator/>
         </group>
 
-        <group id="Lsl.ViewerIntegration"
-                text="Second Life"
-                popup="true">
+        <action id="Lsl.Viewer.OpenManager"
+                class="io.github.koollsl.lsl.viewer.LslViewerManagerAction"
+                text="Second Life..."
+                description="Open the Second Life viewer window"
+                icon="/icons/lslp.svg">
             <add-to-group group-id="ToolsMenu" anchor="last"/>
-            <action id="Lsl.Viewer.Connect"
-                    class="io.github.koollsl.lsl.viewer.LslViewerConnectionAction"
-                    text="Connect to Viewer"/>
-            <action id="Lsl.Viewer.BrowseObjects"
-                    class="io.github.koollsl.lsl.viewer.LslViewerBrowseObjectsAction"
-                    text="Browse Explored Objects..."/>
-            <action id="Lsl.Viewer.DeployMappedScripts"
-                    class="io.github.koollsl.lsl.viewer.LslViewerDeployAction"
-                    text="Push Scripts..."
-                    description="Match project scripts to an explored viewer object by name and push them"/>
-        </group>
+        </action>
     </actions>
 
     <extensions defaultExtensionNs="com.intellij">

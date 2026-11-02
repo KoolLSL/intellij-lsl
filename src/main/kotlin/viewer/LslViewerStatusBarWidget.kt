@@ -7,6 +7,7 @@ import com.intellij.openapi.wm.CustomStatusBarWidget
 import com.intellij.openapi.wm.StatusBar
 import com.intellij.openapi.wm.StatusBarWidget
 import com.intellij.openapi.wm.StatusBarWidgetFactory
+import io.github.koollsl.lsl.shared.settings.LslSettings
 import java.awt.Cursor
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
@@ -18,7 +19,8 @@ class LslViewerStatusBarWidgetFactory : StatusBarWidgetFactory {
 
     override fun getDisplayName(): String = "Second Life Viewer"
 
-    override fun isAvailable(project: Project): Boolean = true
+    override fun isAvailable(project: Project): Boolean =
+        LslSettings.instance.viewerIntegrationEnabled
 
     override fun createWidget(project: Project): StatusBarWidget =
         LslViewerStatusBarWidget(project)

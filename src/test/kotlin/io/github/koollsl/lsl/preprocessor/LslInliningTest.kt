@@ -165,7 +165,7 @@ default {
         val psiFile = myFixture.configureByText("test.lslp", code)
         val result = preprocessor.preprocessFile(psiFile)
 
-        assertFalse(result.contains("logMessage(string"))
+        assertFalse(result.lines().any { it.trim().startsWith("logMessage(") })
         assertTrue(result.contains("_i1_prefix = \"WARN\";"))
         assertTrue(result.contains("_i1_msg = \"Disk full\";"))
         assertTrue(result.contains("string _i1_formatted = _i1_prefix + \" : \" + _i1_msg;"))

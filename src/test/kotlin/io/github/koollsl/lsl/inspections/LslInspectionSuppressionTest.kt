@@ -1,6 +1,6 @@
 package io.github.koollsl.lsl.inspections
 
-import com.intellij.codeInspection.InspectionManager
+import com.intellij.lang.annotation.HighlightSeverity
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import io.github.koollsl.lsl.annotation.LslDisabledCodeInspectionSuppressor
 import io.github.koollsl.lsl.psi.LslNamedElement
@@ -43,12 +43,10 @@ integer duplicateVar = 2;
             """.trimIndent()
         )
 
-        val inspection = LslRedeclaredIdentifierInspection()
-        val manager = InspectionManager.getInstance(project)
-        val problems = inspection.checkFile(file, manager, false)
-
-        assertNotNull(problems)
-        assertEquals(0, problems!!.size)
+        myFixture.enableInspections(LslRedeclaredIdentifierInspection())
+        val problems = myFixture.doHighlighting()
+            .filter { it.description?.startsWith("Redeclared identifier") == true }
+        assertTrue(problems.isEmpty())
     }
 
     fun testRedeclaredIdentifierInspectionCatchesRealDuplicates() {
@@ -60,11 +58,10 @@ integer duplicateVar = 2;
             """.trimIndent()
         )
 
-        val inspection = LslRedeclaredIdentifierInspection()
-        val manager = InspectionManager.getInstance(project)
-        val problems = inspection.checkFile(file, manager, false)
-
-        assertNotNull(problems)
-        assertEquals(1, problems!!.size)
+        myFixture.enableInspections(LslRedeclaredIdentifierInspection())
+        val problems = myFixture.doHighlighting()
+            .filter { it.description?.startsWith("Redeclared identifier") == true }
+        assertEquals(1, problems.size)
+        assertEquals(HighlightSeverity.ERROR, problems.single().severity)
     }
 }

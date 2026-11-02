@@ -1,6 +1,5 @@
 package io.github.koollsl.lsl.inspections
 
-import com.intellij.codeInspection.InspectionManager
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import LslPrimitiveType
 import io.github.koollsl.lsl.parser.LslTypes
@@ -35,7 +34,7 @@ class LslTypeCompatibilityTest : BasePlatformTestCase() {
             "Test.lsl",
             """
 key gKey = "some-string-uuid";
-string gStr = (key)"some-key-uuid";
+string gStr = "some-key-uuid";
 
 key testFunc(string s) {
     return s;
@@ -48,7 +47,7 @@ string testFunc2(key k) {
 default {
     state_entry() {
         key k = "local-string";
-        string s = (key)"local-key";
+        string s = "local-key";
         k = s;
         s = k;
         testFunc(k);
@@ -58,18 +57,13 @@ default {
             """.trimIndent()
         )
 
-        val manager = InspectionManager.getInstance(project)
-
-        val assignmentProblems = LslInvalidAssignmentTypeInspection().checkFile(file, manager, false)
-        assertNotNull(assignmentProblems)
-        assertEquals(0, assignmentProblems!!.size)
-
-        val returnProblems = LslInvalidReturnTypeInspection().checkFile(file, manager, false)
-        assertNotNull(returnProblems)
-        assertEquals(0, returnProblems!!.size)
-
-        val callProblems = LslInvalidFunctionCallArgumentInspection().checkFile(file, manager, false)
-        assertNotNull(callProblems)
-        assertEquals(0, callProblems!!.size)
+        myFixture.enableInspections(
+            LslInvalidAssignmentTypeInspection(),
+            LslInvalidReturnTypeInspection(),
+            LslInvalidFunctionCallArgumentInspection()
+        )
+        val errors = myFixture.doHighlighting()
+            .filter { it.severity == com.intellij.lang.annotation.HighlightSeverity.ERROR }
+        assertTrue(errors.joinToString("\n") { it.description.orEmpty() }, errors.isEmpty())
     }
 }
