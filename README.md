@@ -128,15 +128,14 @@ Matching names are searched throughout the project, so unique script names are r
 
 ### Include Files (LSL only)
 
-For LSL, you can split your code into reusable files and include them in your scripts as your project grows.
+For LSL, you can keep common functions and constants in include files shared across your projects.
 
-* **Create an include file (`.lslm`):** Use **File → New → LSL Module Script...** to create a shared file for functions
-  or constants (for example, `MyLib.lslm`).
-* **Include it in a script:** Add `#include "MyLib.lslm"` to an `.lslp` script. *(External folders must be added as
-  Content Roots in Project Structure.)*
-### Directives
+* **Create an include file (`.lslm`):** Use **File → New → LSL Module Script...** (for example, `MyLib.lslm`). You can save it in a common folder outside the project; in that case, add this folder to Content Roots in Project Structure.
+* **Include it in a script:** Write `#include "MyLib.lslm"` in your `.lslp` script, or even in other `.lslm` . 
 
-* **`#define`** — Defines a constant or macro (e.g., `#define MODEL "PRO"`).
+### Directives (LSL only)
+
+* **`#define`** — Defines a constant (e.g., `#define MODEL "PRO"`). Definitions propagate to included files, so it matters whether they are placed before or after `#include`.
 * **`#undef`** — Removes an existing definition (e.g., `#undef DEBUG`).
 * **`#if`** — Evaluates a custom boolean expression (e.g., ``#if MODEL == "PRO"``).
 * **`#ifdef`** — Includes code if an identifier is defined (e.g., `#ifdef DEBUG`).
@@ -144,8 +143,6 @@ For LSL, you can split your code into reusable files and include them in your sc
 * **`#elif`** — Alternative conditional branch (`else if`) within a block.
 * **`#else`** — Fallback branch when prior conditions fail.
 * **`#endif`** — Closes an active conditional block.
-* **`#include`** — Includes an external `.lslm` file (e.g., `#include "Vectors.lslm"`). The file must be in the same
-  folder or in a folder of the Project properties / Content roots.
 * **`#inline`** — Inlines the function written below directly in the code instead of calling it.
 ---
 
