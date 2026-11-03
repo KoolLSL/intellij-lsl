@@ -152,7 +152,7 @@ Both tools support LSL and SLua development, but they target different workflows
 
 **VS Code + the official Second Life extension** is lightweight and versatile, making it convenient for quick edits, rapid iteration, and working directly with in-world content.
 
-**IntelliJ IDEA + KoolLSL** brings the same core functionality to the JetBrains IDEs while adding advanced navigation, refactoring, inspections, project structure, local history, Git integration, and AI tooling. Creators working on larger projects may prefer its stable and structured project model, where all scripts, libraries, and documentation are organized and kept locally, making it easier to maintaina in the long term.
+**IntelliJ IDEA + KoolLSL** brings the same core functionality to the JetBrains IDEs while adding advanced navigation, refactoring, inspections, project structure, local history, Git integration, and AI tooling. For larger projects, its structured project model helps keep scripts, libraries, and documentation organized in one place, making long-term maintenance easier.
 
 ---
 
