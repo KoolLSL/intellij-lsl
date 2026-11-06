@@ -1,6 +1,8 @@
 package io.github.koollsl.lsl.preprocessor
 
-import KwdbData
+import io.github.koollsl.lsl.definitions.DefinitionsSourceManager
+import io.github.koollsl.lsl.definitions.LslDefinitionData
+import io.github.koollsl.lsl.settings.LslSettings
 import LslPrimitiveType
 import com.intellij.ide.plugins.PluginDetailsService
 import com.intellij.openapi.application.ApplicationManager
@@ -21,8 +23,6 @@ import com.intellij.psi.*
 import com.intellij.psi.util.*
 import io.github.koollsl.lsl.parser.LslTypes
 import io.github.koollsl.lsl.psi.*
-import io.github.koollsl.lsl.shared.definitions.DefinitionsSourceManager
-import io.github.koollsl.lsl.shared.settings.LslSettings
 import io.github.koollsl.lsl.utils.LslFileTypeUtils.BUILD_TARGET_EXTENSIONS
 import io.github.koollsl.lsl.utils.LslFileTypeUtils.isBuildFile
 import io.github.koollsl.lsl.utils.LslFileTypeUtils.isHeaderModule

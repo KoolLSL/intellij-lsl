@@ -1,7 +1,7 @@
 package io.github.koollsl.lsl.references
 
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
-import KwdbData
+import io.github.koollsl.lsl.definitions.LslDefinitionData
 import LslFileType
 import io.github.koollsl.lsl.inspections.LslUnmatchedDirectiveInspection
 import io.github.koollsl.lsl.preprocessor.LslPreprocessorEngine
@@ -172,12 +172,12 @@ default {
         assertFalse(file.text.contains("oldName"))
     }
 
-    fun testKwdbBuiltinsLoaded() {
-        val kwdb = KwdbData.getInstance(project)
-        assertNotNull(kwdb.constants["NAK"])
-        assertNotNull(kwdb.constants["EOF"])
-        assertNotNull(kwdb.functions["llSay"])
-        assertNotNull(kwdb.events["state_entry"])
+    fun testLslBuiltinsLoaded() {
+        val lslData = LslDefinitionData.getInstance(project)
+        assertNotNull(lslData.constants["NAK"])
+        assertNotNull(lslData.constants["EOF"])
+        assertNotNull(lslData.functions["llSay"])
+        assertNotNull(lslData.events["state_entry"])
     }
 
     fun testRecursiveAndConditionalIncludeCollection() {

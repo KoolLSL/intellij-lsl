@@ -1,6 +1,6 @@
 package io.github.koollsl.lsl.completion
 
-import KwdbData
+import io.github.koollsl.lsl.definitions.LslDefinitionData
 import com.intellij.codeInsight.completion.CompletionParameters
 import com.intellij.codeInsight.completion.CompletionProvider
 import com.intellij.codeInsight.completion.CompletionResultSet
@@ -58,7 +58,7 @@ class FunctionCompletionProvider(val addSemicolon: Boolean) : CompletionProvider
         // ---------------------------------------------------------------------
         // Tier 3 (Priority 1.0): KWDB SYSTEM FUNCTIONS
         // ---------------------------------------------------------------------
-        val kwdbFunctions = KwdbData.getInstance(project).functions.values
+        val kwdbFunctions = LslDefinitionData.getInstance(project).functions.values
 
         val kwdbElements = kwdbFunctions
             .distinctBy { it.name }

@@ -12,7 +12,7 @@ import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.application.ModalityState
-import io.github.koollsl.lsl.shared.settings.LslSettings
+import io.github.koollsl.lsl.settings.LslSettings
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.WebSocket

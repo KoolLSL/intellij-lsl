@@ -1,6 +1,6 @@
 package io.github.koollsl.lsl.inspections
 
-import KwdbData
+import io.github.koollsl.lsl.definitions.LslDefinitionData
 import LslLanguage
 import com.intellij.codeInspection.LocalInspectionTool
 import com.intellij.codeInspection.ProblemHighlightType
@@ -23,7 +23,7 @@ class LslReservedIdentifierInspection : LocalInspectionTool() {
         // 1. Fetch file, preprocessor service, and keyword database ONCE per inspection pass
         val file = holder.file
         val preprocessorEngine = holder.project.service<LslPreprocessorEngine>()
-        val kwdbData = KwdbData.getInstance(holder.project)
+        val kwdbData = LslDefinitionData.getInstance(holder.project)
         val kwdbNames = kwdbData.constants.keys + kwdbData.functions.keys + kwdbData.events.keys
 
         return object : LslElementVisitor() {

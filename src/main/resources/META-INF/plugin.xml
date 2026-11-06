@@ -78,6 +78,7 @@
 
     <extensions defaultExtensionNs="com.intellij">
         <notificationGroup id="LSL Viewer Integration" displayType="BALLOON"/>
+        <notificationGroup id="LSL/SLua Definitions" displayType="BALLOON"/>
         <statusBarWidgetFactory id="LslViewerConnectionStatus"
                                 implementation="io.github.koollsl.lsl.viewer.LslViewerStatusBarWidgetFactory"/>
 
@@ -95,7 +96,7 @@
                 extensions="lslp;lslm;lsl"/>
 
         <!-- unpack secondlife.d.luau in the background on startup-->
-        <postStartupActivity implementation="io.github.koollsl.lsl.slua.SluaDefinitionInitializer"/>
+        <postStartupActivity implementation="io.github.koollsl.lsl.definitions.SluaDefinitionInitializer"/>
 
         <!-- Suggest Luau plugin if none is installed -->
         <editorNotificationProvider
@@ -184,7 +185,7 @@
 
         <applicationConfigurable
                 parentId="language"
-                instance="io.github.koollsl.lsl.shared.settings.LslSettingsConfigurable"
+                instance="io.github.koollsl.lsl.settings.LslSettingsConfigurable"
                 id="settings.LslSettingsConfigurable"
                 displayName="LSL"/>
 

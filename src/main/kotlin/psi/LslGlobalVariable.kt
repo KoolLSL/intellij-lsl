@@ -1,6 +1,6 @@
 package io.github.koollsl.lsl.psi
 
-import KwdbData
+import io.github.koollsl.lsl.definitions.LslDefinitionData
 import LslIcons
 import LslPrimitiveType
 import com.intellij.lang.ASTNode
@@ -54,7 +54,7 @@ class LslGlobalVariable(node: ASTNode) : ASTWrapperLslNamedElement(node), Naviga
         )
         sb.append(DocumentationMarkup.DEFINITION_END)
 
-        val description = KwdbData.getInstance(project).elementDocumentation[name]
+        val description = LslDefinitionData.getInstance(project).elementDocumentation[name]
             ?: DocumentationUtils.commentsToDescription(this)
         if (description.isNotBlank()) {
             sb.append(DocumentationMarkup.CONTENT_START)

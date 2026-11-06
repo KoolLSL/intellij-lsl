@@ -1,6 +1,6 @@
 package io.github.koollsl.lsl.inspections
 
-import KwdbData
+import io.github.koollsl.lsl.definitions.LslDefinitionData
 import LslLanguage
 import LslPrimitiveType
 import com.intellij.codeInspection.LocalInspectionTool
@@ -24,7 +24,7 @@ class LslInvalidAssignmentTypeInspection : LocalInspectionTool() {
         // 1. Fetch file and services ONCE per inspection pass
         val file = holder.file
         val preprocessorEngine = holder.project.service<LslPreprocessorEngine>()
-        val kwdbData = KwdbData.getInstance(holder.project)
+        val kwdbData = LslDefinitionData.getInstance(holder.project)
 
         return object : LslElementVisitor() {
 

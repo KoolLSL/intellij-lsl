@@ -1,6 +1,6 @@
 package io.github.koollsl.lsl.references
 
-import KwdbData
+import io.github.koollsl.lsl.definitions.LslDefinitionData
 import com.intellij.openapi.components.service
 import com.intellij.openapi.util.TextRange
 import com.intellij.psi.*
@@ -68,7 +68,7 @@ class LslExpressionFunctionCallReference(val element: LslExpressionFunctionCall)
 
         // 3. Built‑in functions
         val builtinFunctions = listOfNotNull(
-            KwdbData.getInstance(project).functions[functionName]
+            LslDefinitionData.getInstance(project).functions[functionName]
         )
 
         return (localFunctions + includedFunctions + builtinFunctions)

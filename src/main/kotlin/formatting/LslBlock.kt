@@ -19,7 +19,22 @@ open class LslBlock(
 ) : AbstractBlock(node, wrap, alignment) {
     override fun getSpacing(child1: Block?, child2: Block): Spacing? {
         val leftType = (child1 as? LslBlock)?.node?.elementType
-        val rightType = (child2 as? LslBlock)?.node?.elementType
+        val rightNode = (child2 as? LslBlock)?.node
+        val rightType = rightNode?.elementType
+        if (rightType == LslTypes.LINE_COMMENT || rightType == LslTypes.BLOCK_COMMENT) {
+            val hasLineBreakBefore = rightNode.treePrev
+                ?.takeIf { it.elementType == TokenType.WHITE_SPACE }
+                ?.text
+                ?.let { it.contains('\n') || it.contains('\r') }
+                ?: false
+            return Spacing.createSpacing(
+                1,
+                1,
+                if (hasLineBreakBefore || leftType == LslTypes.BRACE_LEFT) 1 else 0,
+                true,
+                codeStyleSettings.KEEP_BLANK_LINES_IN_CODE,
+            )
+        }
         if (child1 != null &&
             (leftType == LslTypes.PREPROCESSOR_DIRECTIVE || rightType == LslTypes.PREPROCESSOR_DIRECTIVE)
         ) {

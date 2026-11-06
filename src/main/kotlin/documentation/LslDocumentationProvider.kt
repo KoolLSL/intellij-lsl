@@ -1,6 +1,6 @@
 package io.github.koollsl.lsl.documentation
 
-import KwdbData
+import io.github.koollsl.lsl.definitions.LslDefinitionData
 import com.intellij.lang.documentation.DocumentationProvider
 import com.intellij.psi.PsiElement
 import com.intellij.util.containers.nullize
@@ -11,7 +11,7 @@ class LslDocumentationProvider : DocumentationProvider {
         when (element) {
             is LslNamedElement ->
                 listOfNotNull(
-                    KwdbData.getInstance(element.project).getByName(element.name)?.name
+                    LslDefinitionData.getInstance(element.project).getByName(element.name)?.name
                 )
                     .mapNotNull { DocumentationUtils.getUrlFor(it) }
                     .nullize()

@@ -317,6 +317,48 @@ default
         )
     }
 
+    fun testStandaloneCommentsStayOnTheirLineWhenLineBreaksAreNotKept() {
+        val commonSettings = com.intellij.psi.codeStyle.CodeStyleSettingsManager.getSettings(project)
+            .getCommonSettings(LslLanguage.INSTANCE)
+        val oldKeepLineBreaks = commonSettings.KEEP_LINE_BREAKS
+        val oldBlockBrace = commonSettings.BRACE_STYLE
+
+        try {
+            commonSettings.KEEP_LINE_BREAKS = false
+            commonSettings.BRACE_STYLE = com.intellij.psi.codeStyle.CommonCodeStyleSettings.END_OF_LINE
+
+            doTest(
+                """
+default{
+state_entry(){
+integer value=1; // Trailing comment
+// Standalone comment
+if(value>0){
+value--;
+}
+}
+}
+                """,
+                """
+default
+{
+    state_entry()
+    {
+        integer value = 1; // Trailing comment
+        // Standalone comment
+        if (value > 0) {
+            value--;
+        }
+    }
+}
+                """
+            )
+        } finally {
+            commonSettings.KEEP_LINE_BREAKS = oldKeepLineBreaks
+            commonSettings.BRACE_STYLE = oldBlockBrace
+        }
+    }
+
     fun testFormattingExpandsCompactedBlocksWhenLineBreaksAreNotKept() {
         val commonSettings = com.intellij.psi.codeStyle.CodeStyleSettingsManager.getSettings(project)
             .getCommonSettings(LslLanguage.INSTANCE)

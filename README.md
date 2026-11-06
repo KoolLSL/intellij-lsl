@@ -172,11 +172,12 @@ JetBrains Marketplace and GitHub Releases, so building it locally is mainly for 
 > This plugin is a personal side project and may not be 100% perfect. If you run into obvious issues, please report them
 > on [GitHub Issues](https://github.com/KoolLSL/intellij-lsl/issues).
 
-This project is a modernized fork of the original [riej/lsl](https://github.com/riej/lsl) plugin. Compiled and tested on
-**IntelliJ IDEA 2026.2.3**, **Java 21**, and **Windows 11**.
+
+Compiled and tested on **IntelliJ IDEA 2026.2.3**, **Java 21**, and **Windows 11**.
 
 If you come from Eclipse IDE with LSLForge, IntelliJ IDEA will feel very familiar as it uses a similar project structure. Compared to LSLForge, this plugin has no internal simulator but offers smarter language tools inside the more modern JetBrains IDEs. This also makes the plugin easier to install and maintain.
 
+SL: Kool Mekanic
 
 <sub style="color: #6a737d;">
 Second Life® and SL™ are registered trademarks of Linden Research, Inc. This plugin is an independent third-party tool and is not affiliated with, sponsored by, or endorsed by Linden Research, Inc.

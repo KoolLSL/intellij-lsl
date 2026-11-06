@@ -1,6 +1,6 @@
 package io.github.koollsl.lsl.annotation
 
-import KwdbData
+import io.github.koollsl.lsl.definitions.LslDefinitionData
 import com.intellij.lang.annotation.AnnotationHolder
 import com.intellij.lang.annotation.Annotator
 import com.intellij.lang.annotation.HighlightSeverity
@@ -31,7 +31,7 @@ class LslAnnotator : Annotator {
         // FAST EXIT 3: Avoid runCatching; handle disabled check directly
         if (engine.isElementDisabled(element)) return
 
-        val kwdbData = KwdbData.getInstance(project)
+        val kwdbData = LslDefinitionData.getInstance(project)
 
         // Main dispatch
         when (element) {

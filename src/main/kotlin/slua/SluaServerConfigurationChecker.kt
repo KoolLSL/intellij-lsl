@@ -2,7 +2,7 @@ package io.github.koollsl.lsl.slua
 
 import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.diagnostic.Logger
-import io.github.koollsl.lsl.shared.definitions.DefinitionsSourceManager
+import io.github.koollsl.lsl.definitions.DefinitionsSourceManager
 import java.io.File
 import java.io.IOException
 

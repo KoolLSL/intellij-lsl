@@ -1,6 +1,6 @@
 package io.github.koollsl.lsl.references
 
-import KwdbData
+import io.github.koollsl.lsl.definitions.LslDefinitionData
 import com.intellij.openapi.components.service
 import com.intellij.openapi.util.TextRange
 import com.intellij.psi.*
@@ -125,7 +125,7 @@ class LslLValueReference(val element: LslLValue) :
 
                     // Built-in constants (Zero-allocation lookup)
                     if (result.isEmpty()) {
-                        val builtinConstant = KwdbData.getInstance(element.project).constants[targetName]
+                        val builtinConstant = LslDefinitionData.getInstance(element.project).constants[targetName]
                         if (builtinConstant != null) {
                             result.add(PsiElementResolveResult(builtinConstant))
                         }

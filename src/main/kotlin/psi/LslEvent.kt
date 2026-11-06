@@ -1,6 +1,6 @@
 package io.github.koollsl.lsl.psi
 
-import KwdbData
+import io.github.koollsl.lsl.definitions.LslDefinitionData
 import LslIcons
 import com.intellij.lang.ASTNode
 import com.intellij.lang.documentation.DocumentationMarkup
@@ -44,7 +44,7 @@ class LslEvent(node: ASTNode) : ASTWrapperLslNamedElement(node), NavigatablePsiE
     override fun getIcon(unused: Boolean): Icon = LslIcons.EVENT
 
     override fun generateDocumentation(): String {
-        val eventDeclaration = KwdbData.getInstance(project).events[name] ?: return ""
+        val eventDeclaration = LslDefinitionData.getInstance(project).events[name] ?: return ""
 
         val sb = StringBuilder()
 
@@ -62,7 +62,7 @@ class LslEvent(node: ASTNode) : ASTWrapperLslNamedElement(node), NavigatablePsiE
 
         sb.append(DocumentationMarkup.DEFINITION_END)
 
-        val description = KwdbData.getInstance(project).elementDocumentation[name]
+        val description = LslDefinitionData.getInstance(project).elementDocumentation[name]
             ?: DocumentationUtils.commentsToDescription(this)
         if (description.isNotBlank()) {
             sb.append(DocumentationMarkup.CONTENT_START)

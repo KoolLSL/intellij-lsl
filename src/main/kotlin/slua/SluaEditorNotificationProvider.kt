@@ -64,7 +64,7 @@ class SluaEditorNotificationProvider : EditorNotificationProvider {
                 panel.createActionLabel("Show correct paths") {
                     ShowSettingsUtil.getInstance().showSettingsDialog(
                         project,
-                        io.github.koollsl.lsl.shared.settings.LslSettingsConfigurable::class.java
+                        io.github.koollsl.lsl.settings.LslSettingsConfigurable::class.java
                     )
                 }
                 panel

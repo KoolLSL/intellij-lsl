@@ -1,6 +1,6 @@
 package io.github.koollsl.lsl.references
 
-import KwdbData
+import io.github.koollsl.lsl.definitions.LslDefinitionData
 import com.intellij.openapi.roots.ProjectRootManager
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
@@ -35,7 +35,7 @@ object LslReferenceUtils {
         }
 
         // Check in KWDB at last.
-        return KwdbData.getInstance(from.project).getByName(name)
+        return LslDefinitionData.getInstance(from.project).getByName(name)
     }
 
     /**

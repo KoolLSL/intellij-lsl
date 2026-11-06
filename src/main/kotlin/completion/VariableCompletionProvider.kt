@@ -1,6 +1,6 @@
 package io.github.koollsl.lsl.completion
 
-import KwdbData
+import io.github.koollsl.lsl.definitions.LslDefinitionData
 import com.intellij.codeInsight.completion.CompletionParameters
 import com.intellij.codeInsight.completion.CompletionProvider
 import com.intellij.codeInsight.completion.CompletionResultSet
@@ -76,7 +76,7 @@ class VariableCompletionProvider : CompletionProvider<CompletionParameters>() {
         // ---------------------------------------------------------------------
         // Tier 3 (Priority 1.0): KWDB SYSTEM CONSTANTS
         // ---------------------------------------------------------------------
-        val kwdbConstants = KwdbData.getInstance(project).constants.values
+        val kwdbConstants = LslDefinitionData.getInstance(project).constants.values
         val kwdbElements = kwdbConstants
             .distinctBy { it.name }
             .mapNotNull { constant ->

@@ -14,7 +14,7 @@ import com.intellij.icons.AllIcons
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
 import com.intellij.util.ui.UIUtil
-import io.github.koollsl.lsl.shared.settings.LslSettings
+import io.github.koollsl.lsl.settings.LslSettings
 import java.awt.BorderLayout
 import java.awt.Component
 import java.awt.Dimension

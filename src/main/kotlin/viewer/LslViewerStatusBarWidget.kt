@@ -7,7 +7,7 @@ import com.intellij.openapi.wm.CustomStatusBarWidget
 import com.intellij.openapi.wm.StatusBar
 import com.intellij.openapi.wm.StatusBarWidget
 import com.intellij.openapi.wm.StatusBarWidgetFactory
-import io.github.koollsl.lsl.shared.settings.LslSettings
+import io.github.koollsl.lsl.settings.LslSettings
 import java.awt.Cursor
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent

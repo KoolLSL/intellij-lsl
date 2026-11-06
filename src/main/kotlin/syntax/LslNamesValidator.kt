@@ -1,6 +1,6 @@
 package io.github.koollsl.lsl.syntax
 
-import KwdbData
+import io.github.koollsl.lsl.definitions.LslDefinitionData
 import com.intellij.lang.refactoring.NamesValidator
 import com.intellij.openapi.project.Project
 
@@ -11,7 +11,7 @@ class LslNamesValidator : NamesValidator {
 
     override fun isKeyword(name: String, project: Project): Boolean =
         listOf("default", "state", "jump", "return", "if", "else", "while", "do", "for", "print")
-            .plus(KwdbData.getInstance(project).events.keys)
+            .plus(LslDefinitionData.getInstance(project).events.keys)
             .contains(name)
 
     override fun isIdentifier(name: String, project: Project): Boolean =
