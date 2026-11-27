@@ -127,7 +127,6 @@ class LslFormattingModelBuilder : FormattingModelBuilder {
             .afterInside(LslTypes.BRACE_LEFT, LslTypes.STATEMENT_BLOCK).spaceIf(commonSettings.SPACE_WITHIN_BRACES)
             .beforeInside(LslTypes.BRACE_RIGHT, LslTypes.STATEMENT_BLOCK).spaceIf(commonSettings.SPACE_WITHIN_BRACES)
 
-            .betweenInside(parenthesesRightSet, statementsWithoutBlock, LslTypes.STATEMENT_IF).spaceIf(true)
             .betweenInside(parenthesesRightSet, statementsWithoutBlock, LslTypes.STATEMENT_WHILE).spaceIf(true)
             .betweenInside(parenthesesRightSet, statementsWithoutBlock, LslTypes.STATEMENT_FOR).spaceIf(true)
             .betweenInside(LslTypes.PARENTHESES, LslTypes.EXPRESSIONS, LslTypes.EXPRESSION_TYPE_CAST)
@@ -156,6 +155,12 @@ class LslFormattingModelBuilder : FormattingModelBuilder {
             .betweenInside(LslTypes.TYPE_NAME, LslTypes.IDENTIFIER, LslTypes.STATEMENT_VARIABLE).spaces(1)
             .betweenInside(LslTypes.TYPE_NAME, LslTypes.IDENTIFIER, LslTypes.ARGUMENT).spaces(1)
             .betweenInside(LslTypes.TYPE_NAME, LslTypes.IDENTIFIER, LslTypes.FUNCTION).spaces(1)
+
+        builder = if (commonSettings.KEEP_SIMPLE_BLOCKS_IN_ONE_LINE) {
+            builder.betweenInside(parenthesesRightSet, statementsWithoutBlock, LslTypes.STATEMENT_IF).spaceIf(true)
+        } else {
+            builder.betweenInside(parenthesesRightSet, statementsWithoutBlock, LslTypes.STATEMENT_IF).lineBreakInCode()
+        }
 
         if (isClassNextLine) {
             builder = builder

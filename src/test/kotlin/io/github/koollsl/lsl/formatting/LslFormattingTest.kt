@@ -359,6 +359,53 @@ default
         }
     }
 
+    fun testFormattingBreaksBraceLessIfBodyUnlessSimpleBlocksAreKeptOnOneLine() {
+        val commonSettings = com.intellij.psi.codeStyle.CodeStyleSettingsManager.getSettings(project)
+            .getCommonSettings(LslLanguage.INSTANCE)
+        val oldKeepLineBreaks = commonSettings.KEEP_LINE_BREAKS
+        val oldKeepSimpleBlocksInOneLine = commonSettings.KEEP_SIMPLE_BLOCKS_IN_ONE_LINE
+
+        try {
+            commonSettings.KEEP_LINE_BREAKS = false
+            commonSettings.KEEP_SIMPLE_BLOCKS_IN_ONE_LINE = false
+
+            doTest(
+                """
+default{state_entry(){if(1)return;}}
+                """,
+                """
+default
+{
+    state_entry()
+    {
+        if (1)
+            return;
+    }
+}
+                """
+            )
+
+            commonSettings.KEEP_SIMPLE_BLOCKS_IN_ONE_LINE = true
+            doTest(
+                """
+default{state_entry(){if(1)return;}}
+                """,
+                """
+default
+{
+    state_entry()
+    {
+        if (1) return;
+    }
+}
+                """
+            )
+        } finally {
+            commonSettings.KEEP_LINE_BREAKS = oldKeepLineBreaks
+            commonSettings.KEEP_SIMPLE_BLOCKS_IN_ONE_LINE = oldKeepSimpleBlocksInOneLine
+        }
+    }
+
     fun testFormattingExpandsCompactedBlocksWhenLineBreaksAreNotKept() {
         val commonSettings = com.intellij.psi.codeStyle.CodeStyleSettingsManager.getSettings(project)
             .getCommonSettings(LslLanguage.INSTANCE)

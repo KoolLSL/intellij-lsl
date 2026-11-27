@@ -1866,10 +1866,15 @@ class LslPreprocessorEngine(private val project: Project) {
 
         val prefix = "_i${callsiteId}_"
 
-        for (arg in func.arguments) {
+        val passThroughParams = mutableMapOf<String, String>()
+        for ((idx, arg) in func.arguments.withIndex()) {
             val argName = arg.name
+            val expression = call.expressions.getOrNull(idx)
+            if (argName != null && expression != null && !isParameterWritten(func, argName)) {
+                findEnclosingParameter(call, expression.text)?.let { passThroughParams[argName] = it }
+            }
             if (argName != null) {
-                paramMap[argName] = "${prefix}$argName"
+                paramMap[argName] = passThroughParams[argName] ?: "${prefix}$argName"
             }
         }
 
@@ -1905,8 +1910,11 @@ class LslPreprocessorEngine(private val project: Project) {
             val expr = call.expressions.getOrNull(idx)
             val argVal = expr?.text ?: defaultForType(arg.lslType)
             val formattedArg = if (isSimpleAtomicExpression(expr)) argVal else "($argVal)"
-            val renamed = paramMap[arg.name]!!
-            stmts.add("${arg.lslType} $renamed = $formattedArg;")
+            val argName = arg.name
+            if (argName != null && argName !in passThroughParams) {
+                val renamed = paramMap[argName]!!
+                stmts.add("${arg.lslType} $renamed = $formattedArg;")
+            }
         }
 
         val isVoid = func.lslType == LslPrimitiveType.VOID || func.typeNameEl == null
@@ -2001,6 +2009,59 @@ class LslPreprocessorEngine(private val project: Project) {
         }
 
         return sbCode.toString()
+    }
+
+    private fun findEnclosingParameter(call: LslExpressionFunctionCall, expressionText: String): String? {
+        val name = expressionText.trim()
+        if (!name.matches(Regex("""[A-Za-z_][A-Za-z_0-9]*"""))) return null
+
+        var scope: PsiElement? = call.parent
+        while (scope != null && scope !is LslFunction && scope !is LslEvent) {
+            scope = scope.parent
+        }
+        val enclosingScope = scope ?: return null
+        val parameterNames = when (enclosingScope) {
+            is LslFunction -> enclosingScope.arguments.mapNotNull { it.name }
+            is LslEvent -> enclosingScope.arguments.mapNotNull { it.name }
+            else -> return null
+        }
+        if (name !in parameterNames) return null
+
+        var node: PsiElement? = call.parent
+        while (node != null && node != enclosingScope) {
+            if (node is LslStatementBlock &&
+                node.children.filterIsInstance<LslStatementVariable>().any { it.name == name }
+            ) {
+                return null
+            }
+            node = node.parent
+        }
+        return name
+    }
+
+    private fun isParameterWritten(func: LslFunction, parameterName: String): Boolean {
+        val body = func.body ?: return false
+
+        if (PsiTreeUtil.collectElementsOfType(body, LslExpressionAssignment::class.java)
+                .any { it.lValue?.variableName == parameterName }
+        ) {
+            return true
+        }
+
+        val prefixes = PsiTreeUtil.collectElementsOfType(body, LslExpressionUnaryPrefix::class.java)
+        if (prefixes.any {
+                (it.operator == LslTypes.PLUS_PLUS || it.operator == LslTypes.MINUS_MINUS) &&
+                        (it.expression as? LslLValue)?.variableName == parameterName
+            }
+        ) {
+            return true
+        }
+
+        val postfixes = PsiTreeUtil.collectElementsOfType(body, LslExpressionUnaryPostfix::class.java)
+        return postfixes.any {
+            (it.operator == LslTypes.PLUS_PLUS || it.operator == LslTypes.MINUS_MINUS) &&
+                    (it.expression as? LslLValue)?.variableName == parameterName
+        }
     }
 
     private fun transformStatementWithReturns(

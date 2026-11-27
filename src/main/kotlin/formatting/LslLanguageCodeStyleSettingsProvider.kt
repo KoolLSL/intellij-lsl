@@ -20,10 +20,7 @@ string bar(integer a)
 {
     list result = ["a"];
     // Zero
-    if (a == 0)
-    {
-        return "zero";
-    }
+    if (a == 0) return "zero";
     // Negative
     else if (a < 0)
     {

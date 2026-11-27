@@ -184,7 +184,7 @@ tasks.register("installPluginToIDE") {
 
         // Close all IDEs gracefully. Warning: "exit" is not documented anywhere
         providers.exec {
-            commandLine("C:\\Program Files\\JetBrains\\IntelliJ IDEA 2026.2.1\\bin\\idea.exe", "exit")
+            commandLine("C:\\Program Files\\JetBrains\\IntelliJ IDEA\\bin\\idea.exe", "exit")
         }.result.get()
 
     }

@@ -6,7 +6,7 @@ import com.intellij.openapi.project.Project
 
 class LslNamesValidator : NamesValidator {
     companion object {
-        private val identifierRegex = Regex("^[a-zA-Z][a-zA-Z0-9_]*$")
+        private val identifierRegex = Regex("^[a-zA-Z_][a-zA-Z0-9_]*$")
     }
 
     override fun isKeyword(name: String, project: Project): Boolean =

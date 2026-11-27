@@ -143,16 +143,16 @@ For LSL, you can keep common functions and constants in include files shared acr
 * **`#elif`** — Alternative conditional branch (`else if`) within a block.
 * **`#else`** — Fallback branch when prior conditions fail.
 * **`#endif`** — Closes an active conditional block.
-* **`#inline`** — Inlines the function written below directly in the code instead of calling it.
+* **`#inline`** — Define a reusable macro function, it will be inlined in the code instead of being called.
 ---
 
 ### IntelliJ vs VS Code
 
 Both tools support LSL and SLua development, but they target different workflows.
 
-**VS Code + the official Second Life extension** is lightweight and versatile, making it convenient for quick edits, rapid iteration, and working directly with in-world content.
+**VS Code + the official Second Life extension** is lightweight and versatile, making it convenient for quick edits, rapid iteration, and working directly with in-world content. The workflow is more in-world objects to editor.
 
-**IntelliJ IDEA + KoolLSL** brings the same core functionality to the JetBrains IDEs while adding advanced navigation, refactoring, inspections, project structure, local history, Git integration, and AI tooling. For larger projects, its structured project model helps keep scripts, libraries, and documentation organized in one place, making long-term maintenance easier.
+**IntelliJ IDEA + KoolLSL** brings the same core functionality to the JetBrains IDEs while adding advanced navigation, refactoring, inspections, project structure, local history, Git integration, and AI tooling. For larger projects, its structured project model helps keep scripts, libraries, and documentation organized in one place, making long-term maintenance easier. The workflow is more editor to in-world objects.
 
 ---
 

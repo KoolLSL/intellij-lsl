@@ -1,0 +1,4 @@
+2026.11.24
+- Fixed: LSL, could not refactor and rename a variable if the new name started by "_".
+2026.11
+- Fixed: LSL, Reformat Code, wrong ident for comments above "else".

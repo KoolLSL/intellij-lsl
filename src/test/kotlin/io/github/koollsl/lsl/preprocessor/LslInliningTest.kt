@@ -172,6 +172,72 @@ default {
         assertTrue(result.contains("llOwnerSay(_i1_formatted);"))
     }
 
+    fun testBlockInliningReusesReadOnlyEnclosingParameter() {
+        val code = """
+#inline notify(string data) {
+    llOwnerSay(data);
+}
+
+dispatch(string data) {
+    notify(data);
+}
+
+default {
+    dataserver(key queryid, string data) {
+        notify(data);
+    }
+}
+        """.trimIndent()
+
+        val psiFile = myFixture.configureByText("test.lslp", code)
+        val result = preprocessor.preprocessFile(psiFile)
+
+        assertTrue(result.contains("llOwnerSay(data);"))
+        assertFalse(result.contains("_i1_data"))
+    }
+
+    fun testBlockInliningKeepsTemporaryWhenParameterIsWritten() {
+        val code = """
+#inline integer increment(integer value) {
+    value++;
+    return value;
+}
+
+default {
+    dataserver(key queryid, integer value) {
+        integer result = increment(value);
+    }
+}
+        """.trimIndent()
+
+        val psiFile = myFixture.configureByText("test.lslp", code)
+        val result = preprocessor.preprocessFile(psiFile)
+
+        assertTrue(result.contains("_i1_value = (value);"))
+        assertTrue(result.contains("_i1_value++"))
+    }
+
+    fun testBlockInliningDoesNotReuseShadowedEnclosingParameter() {
+        val code = """
+#inline notify(string data) {
+    llOwnerSay(data);
+}
+
+default {
+    dataserver(key queryid, string data) {
+        string data = "local";
+        notify(data);
+    }
+}
+        """.trimIndent()
+
+        val psiFile = myFixture.configureByText("test.lslp", code)
+        val result = preprocessor.preprocessFile(psiFile)
+
+        assertTrue(result.contains("string _i1_data = (data);"))
+        assertTrue(result.contains("llOwnerSay(_i1_data);"))
+    }
+
     fun testRecursiveFunctionInliningRejection() {
         val code = """
 #inline integer factorial(integer n) {
